@@ -1,4 +1,5 @@
 """Abstraction of the ExaSPIM Instrument."""
+
 import threading
 
 import numpy as np
@@ -54,19 +55,22 @@ class Exaspim(Spim):
         self.daq = None
 
         if self.cfg.motion_control.get("simulated", False) or self.simulated:
+            print("HERE")
             self.tigerbox = SimTiger(
                 **self.cfg.motion_control["driver_kwds"],
-                build_config={'Motor Axes': ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']})
-        else :
+                build_config={"Motor Axes": []},
+            )
+            # ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']
+        else:
+            print("NOTHERE")
             self.tigerbox = TigerController(**self.cfg.motion_control["driver_kwds"])
 
-        self.sample_pose = SamplePose(self.tigerbox,
-                                      **self.cfg.sample_pose_kwds)
+        self.sample_pose = SamplePose(self.tigerbox, **self.cfg.sample_pose_kwds)
         # Extra Internal State attributes for the current image capture
         # sequence. These really only need to persist for logging purposes.
         self.frame_index = 0  # current image to capture.
         self.total_tiles = 0  # tiles to be captured.
-        self.x_y_tiles = 0    # x*y tiles to be captured.
+        self.x_y_tiles = 0  # x*y tiles to be captured.
         self.curr_tile_index = 0
         self.downsampler = DownSample()
         self.prev_frame_chunk_index = None  # chunk index of most recent frame.
@@ -74,8 +78,8 @@ class Exaspim(Spim):
         self.stage_y_pos_um = None  # Current y position in [um]
         self.stage_z_pos_um = None  # Current z position in [um]
         self.start_pos = None  # Start position of scan
-        self.start_time = None # Start time of scan
-        self.tile_time_s = None # Time it takes to complete one stack
+        self.start_time = None  # Start time of scan
+        self.tile_time_s = None  # Time it takes to complete one stack
         self.stack_transfer_workers = {}  # moves z-stacks to destination folder.
         self.lasers = {}  # populated in _setup_lasers.
 
@@ -100,14 +104,21 @@ class Exaspim(Spim):
         # self._grab_background_image()
         self.chunk_lock = threading.Lock()
         self.stage_lock = threading.Lock()
+
     def _setup_joystick(self):
         """Configure joystick based on value in config"""
 
-        joystick_mapping = self.cfg.joystick_kwds['axis_map'].copy()    # Don't overwrite config values
-        for axis in self.tigerbox.get_build_config()['Motor Axes']: # Loop through axes in tigerbox
+        joystick_mapping = self.cfg.joystick_kwds[
+            "axis_map"
+        ].copy()  # Don't overwrite config values
+        for axis in self.tigerbox.get_build_config()[
+            "Motor Axes"
+        ]:  # Loop through axes in tigerbox
             if axis.lower() in joystick_mapping.keys():
                 # If axis specified in config, map it to correct joystick
-                joystick_mapping[axis.lower()] = JoystickInput(joystick_mapping[axis.lower()])
+                joystick_mapping[axis.lower()] = JoystickInput(
+                    joystick_mapping[axis.lower()]
+                )
             else:
                 # else set axis to map to no joystick direction
                 joystick_mapping[axis.lower()] = JoystickInput(0)
@@ -118,22 +129,24 @@ class Exaspim(Spim):
 
         self.log.debug(f"Setting up lasers")
         for wl, specs in self.cfg.channel_specs.items():
-            if 'port' in specs['kwds'].keys() and specs['kwds']['port'] == 'COMxx':
-                self.log.warning(f'Skipping setup for laser {wl} due to no COM port specified')
+            if "port" in specs["kwds"].keys() and specs["kwds"]["port"] == "COMxx":
+                self.log.warning(
+                    f"Skipping setup for laser {wl} due to no COM port specified"
+                )
                 continue
-            __import__(specs['driver'])
-            laser_class = getattr(sys.modules[specs['driver']], specs['module'])
-            kwds = dict(specs['kwds'])
+            __import__(specs["driver"])
+            laser_class = getattr(sys.modules[specs["driver"]], specs["module"])
+            kwds = dict(specs["kwds"])
             for k, v in kwds.items():
-                if str(v).split('.')[0] in dir(sys.modules[specs['driver']]):
-                    arg_class = getattr(sys.modules[specs['driver']], v.split('.')[0])
-                    kwds[k] = getattr(arg_class, '.'.join(v.split('.')[1:]))
+                if str(v).split(".")[0] in dir(sys.modules[specs["driver"]]):
+                    arg_class = getattr(sys.modules[specs["driver"]], v.split(".")[0])
+                    kwds[k] = getattr(arg_class, ".".join(v.split(".")[1:]))
                 else:
-                    kwds[k] = eval(v) if '.' in str(v) else v
+                    kwds[k] = eval(v) if "." in str(v) else v
 
             self.lasers[wl] = laser_class(**kwds) if not self.simulated else Mock()
             self.log.debug(f"Successfully setup {wl} laser")
-            
+
     def _setup_motion_stage(self):
         """Configure the sample stage according to the config."""
         # Disable backlash compensation.
@@ -147,14 +160,15 @@ class Exaspim(Spim):
 
     def __simulated_grab_frame(self):
         elapsed_time = perf_counter() - self.last_frame_time
-        if elapsed_time < 1. / 6.4:
-            remaining_time = 1. / 6.4 - elapsed_time
+        if elapsed_time < 1.0 / 6.4:
+            remaining_time = 1.0 / 6.4 - elapsed_time
             sleep(remaining_time)
         self.last_frame_time = perf_counter()
         # Image shape is a buffer organized by y and then by x.
-        return np.zeros((self.cfg.sensor_row_count,
-                         self.cfg.sensor_column_count),
-                        dtype=self.cfg.image_dtype)
+        return np.zeros(
+            (self.cfg.sensor_row_count, self.cfg.sensor_column_count),
+            dtype=self.cfg.image_dtype,
+        )
 
     def _setup_camera(self):
         """Configure the camera according to the config."""
@@ -162,10 +176,11 @@ class Exaspim(Spim):
         self.cam.configure()
         if self.simulated:
             self.last_frame_time = perf_counter()
-            self.cam.get_camera_acquisition_state.return_value = {'dropped_frames': 0}
-            self.cam.collect_background.return_value = \
-                np.zeros((self.cfg.sensor_row_count, self.cfg.sensor_column_count),
-                         dtype=self.cfg.image_dtype)
+            self.cam.get_camera_acquisition_state.return_value = {"dropped_frames": 0}
+            self.cam.collect_background.return_value = np.zeros(
+                (self.cfg.sensor_row_count, self.cfg.sensor_column_count),
+                dtype=self.cfg.image_dtype,
+            )
             self.cam.grab_frame = self.__simulated_grab_frame
             self.cam.get_mainboard_temperature.return_value = 23.15
             self.cam.get_sensor_temperature.return_value = 23.15
@@ -179,7 +194,9 @@ class Exaspim(Spim):
 
         self.active_lasers = wavelengths
         self.log.info("Generating waveforms.")
-        voltages_t = generate_waveforms(self.cfg, plot=False, channels=self.active_lasers, live=live)
+        voltages_t = generate_waveforms(
+            self.cfg, plot=False, channels=self.active_lasers, live=live
+        )
         print(voltages_t.shape)
         self.log.info("Writing waveforms to hardware.")
         self.ni.assign_waveforms(voltages_t, self.scout_mode)
@@ -193,8 +210,9 @@ class Exaspim(Spim):
         #   i.e: we are acquiring images and cannot change the hardware settings.
 
         if self.acquiring_images:
-            raise RuntimeError("Cannot change system configuration while "
-                               "acquiring images.")
+            raise RuntimeError(
+                "Cannot change system configuration while " "acquiring images."
+            )
         if self.livestream_enabled:
             self.cam.stop()
         self.cam.configure()  # configures from config.
@@ -205,120 +223,161 @@ class Exaspim(Spim):
 
     def log_system_metadata(self):
         # log motion control settings
-        self.log.info('motion control motorized axes parameters',
-                      extra={'tags': ['schema']})
+        self.log.info(
+            "motion control motorized axes parameters", extra={"tags": ["schema"]}
+        )
         build_config = self.tigerbox.get_build_config()
-        self.log.debug(f'{build_config}')
-        ordered_axes = build_config['Motor Axes']
+        self.log.debug(f"{build_config}")
+        ordered_axes = build_config["Motor Axes"]
         for axis in ordered_axes:
             axis_settings = self.tigerbox.get_info(axis)
             for setting in axis_settings:
-                self.log.info(f'{axis} axis, {setting}, {axis_settings[setting]}',
-                              extra={'tags': ['schema']})
+                self.log.info(
+                    f"{axis} axis, {setting}, {axis_settings[setting]}",
+                    extra={"tags": ["schema"]},
+                )
         # Log camera settings.
         self.cam.schema_log_system_metadata()
 
     def run_from_config(self):
-        self.collect_volumetric_image(self.cfg.volume_x_um,
-                                      self.cfg.volume_y_um,
-                                      self.cfg.volume_z_um,
-                                      self.cfg.channels,
-                                      self.cfg.tile_overlap_x_percent,
-                                      self.cfg.tile_overlap_y_percent,
-                                      self.cfg.z_step_size_um,
-                                      self.cfg.start_tile_index,
-                                      self.cfg.end_tile_index,
-                                      self.cfg.tile_prefix,
-                                      self.cfg.compressor_chunk_size,
-                                      self.cache_storage_dir,
-                                      # TODO: make these last two config based.
-                                      self.img_storage_dir,
-                                      self.deriv_storage_dir)
+        self.collect_volumetric_image(
+            self.cfg.volume_x_um,
+            self.cfg.volume_y_um,
+            self.cfg.volume_z_um,
+            self.cfg.channels,
+            self.cfg.tile_overlap_x_percent,
+            self.cfg.tile_overlap_y_percent,
+            self.cfg.z_step_size_um,
+            self.cfg.start_tile_index,
+            self.cfg.end_tile_index,
+            self.cfg.tile_prefix,
+            self.cfg.compressor_chunk_size,
+            self.cache_storage_dir,
+            # TODO: make these last two config based.
+            self.img_storage_dir,
+            self.deriv_storage_dir,
+        )
 
     @lock_external_user_input
-    def collect_volumetric_image(self, volume_x_um: float, volume_y_um: float,
-                                 volume_z_um: float,
-                                 channels: list[int],
-                                 tile_overlap_x_percent: float,
-                                 tile_overlap_y_percent: float,
-                                 z_step_size_um: float,
-                                 start_tile_index: int = None,
-                                 end_tile_index: int = None,
-                                 tile_prefix: str = "",
-                                 compressor_chunk_size: int = None,
-                                 local_storage_dir: Path = Path("."),
-                                 img_storage_dir: Path = None,
-                                 deriv_storage_dir: Path = None,
-                                 do_mip: bool = True):
+    def collect_volumetric_image(
+        self,
+        volume_x_um: float,
+        volume_y_um: float,
+        volume_z_um: float,
+        channels: list[int],
+        tile_overlap_x_percent: float,
+        tile_overlap_y_percent: float,
+        z_step_size_um: float,
+        start_tile_index: int = None,
+        end_tile_index: int = None,
+        tile_prefix: str = "",
+        compressor_chunk_size: int = None,
+        local_storage_dir: Path = Path("."),
+        img_storage_dir: Path = None,
+        deriv_storage_dir: Path = None,
+        do_mip: bool = True,
+    ):
         # TODO: pass in start position as a parameter.
         """Collect a volumetric image with specified size/overlap specs."""
         self.acquiring_images = True
         # Memory checks.
-        chunk_size = self.cfg.compressor_chunk_size \
-            if compressor_chunk_size is None else compressor_chunk_size
+        chunk_size = (
+            self.cfg.compressor_chunk_size
+            if compressor_chunk_size is None
+            else compressor_chunk_size
+        )
         try:  # Ensure we have enough memory for the allocated chunk size.
             self._check_system_memory_resources(len(channels), chunk_size)
         except MemoryError as e:
             self.log.error(e)
             raise
-        x_grid_step_um, y_grid_step_um = self.get_xy_grid_step(tile_overlap_x_percent,
-                                                               tile_overlap_y_percent)
-        xtiles, ytiles, ztiles = self.get_tile_counts(tile_overlap_x_percent,
-                                                      tile_overlap_y_percent,
-                                                      z_step_size_um,
-                                                      volume_x_um, volume_y_um,
-                                                      volume_z_um)
-        self.x_y_tiles = xtiles*ytiles
+        x_grid_step_um, y_grid_step_um = self.get_xy_grid_step(
+            tile_overlap_x_percent, tile_overlap_y_percent
+        )
+        xtiles, ytiles, ztiles = self.get_tile_counts(
+            tile_overlap_x_percent,
+            tile_overlap_y_percent,
+            z_step_size_um,
+            volume_x_um,
+            volume_y_um,
+            volume_z_um,
+        )
+        self.x_y_tiles = xtiles * ytiles
         start_tile_index = 0 if start_tile_index is None else start_tile_index
-        end_tile_index = xtiles * ytiles - 1 \
-            if end_tile_index is None else end_tile_index
+        end_tile_index = (
+            xtiles * ytiles - 1 if end_tile_index is None else end_tile_index
+        )
         if start_tile_index > 0:
-            self.log.warning(f"Starting volumetric image acquisition from tile "
-                             f"{start_tile_index}.")
+            self.log.warning(
+                f"Starting volumetric image acquisition from tile "
+                f"{start_tile_index}."
+            )
         if end_tile_index != xtiles * ytiles - 1:
-            self.log.warning(f"Ending volumetric image acquisition early. "
-                             f"Last tile index is {end_tile_index}")
+            self.log.warning(
+                f"Ending volumetric image acquisition early. "
+                f"Last tile index is {end_tile_index}"
+            )
 
         # Log relevant info about this imaging run.
         # self.log_system_metadata()
         # TODO NEW BUG, this seems to overload the Tiger responses
         self.start_time = datetime.now()
 
-        acquisition_params = \
-            {
-                'session_start_time': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-                'local_storage_directory': str(local_storage_dir),
-                'external_storage_directory': str(img_storage_dir),
-                'specimen_id': self.cfg.imaging_specs['subject_id'],
-                'subject_id': self.cfg.imaging_specs['subject_id'],
-                'instrument_id': 'exaspim-01',
-                'chamber_immersion': {'medium': self.cfg.immersion_medium,
-                                      'refractive_index': self.cfg.immersion_medium_refractive_index},
-                'experimenter_full_name': [self.cfg.experimenters_name],  # Needs to be in list for AIND Schema,
-                'x_anatomical_direction': self.cfg.x_anatomical_direction,
-                'y_anatomical_direction': self.cfg.y_anatomical_direction,
-                'z_anatomical_direction': self.cfg.z_anatomical_direction,
-                'tags': ['schema']
-            }
+        acquisition_params = {
+            "session_start_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "local_storage_directory": str(local_storage_dir),
+            "external_storage_directory": str(img_storage_dir),
+            "specimen_id": self.cfg.imaging_specs["subject_id"],
+            "subject_id": self.cfg.imaging_specs["subject_id"],
+            "instrument_id": "exaspim-01",
+            "chamber_immersion": {
+                "medium": self.cfg.immersion_medium,
+                "refractive_index": self.cfg.immersion_medium_refractive_index,
+            },
+            "experimenter_full_name": [
+                self.cfg.experimenters_name
+            ],  # Needs to be in list for AIND Schema,
+            "x_anatomical_direction": self.cfg.x_anatomical_direction,
+            "y_anatomical_direction": self.cfg.y_anatomical_direction,
+            "z_anatomical_direction": self.cfg.z_anatomical_direction,
+            "tags": ["schema"],
+        }
         self.log.info("acquisition parameters", extra=acquisition_params)
 
-        axes_data = \
-            {
-                'axes': [{'name': 'X', 'dimension': 2, 'direction' : self.cfg.x_anatomical_direction},
-                         {'name': 'Y', 'dimension': 1, 'direction' : self.cfg.y_anatomical_direction},
-                         {'name': 'Z', 'dimension': 0, 'direction' : self.cfg.z_anatomical_direction}],
-                'tags': ['schema']
-            }
-        self.log.info('axes_data', extra=axes_data)
+        axes_data = {
+            "axes": [
+                {
+                    "name": "X",
+                    "dimension": 2,
+                    "direction": self.cfg.x_anatomical_direction,
+                },
+                {
+                    "name": "Y",
+                    "dimension": 1,
+                    "direction": self.cfg.y_anatomical_direction,
+                },
+                {
+                    "name": "Z",
+                    "dimension": 0,
+                    "direction": self.cfg.z_anatomical_direction,
+                },
+            ],
+            "tags": ["schema"],
+        }
+        self.log.info("axes_data", extra=axes_data)
 
         # Update internal state.
         self.total_tiles = xtiles * ytiles * ztiles * len(channels)
         self.log.debug(f"Total tiles: {self.total_tiles}.")
-        self.log.debug(f"Grid step: {x_grid_step_um:.3f}[um] in x, "
-                       f"{y_grid_step_um:.3f}[um] in y.")
-        self.log.debug(f"Imaging operation will produce: "
-                       f"{xtiles} xtiles, {ytiles} ytiles, and {ztiles} ztiles"
-                       f" per channel.")
+        self.log.debug(
+            f"Grid step: {x_grid_step_um:.3f}[um] in x, "
+            f"{y_grid_step_um:.3f}[um] in y."
+        )
+        self.log.debug(
+            f"Imaging operation will produce: "
+            f"{xtiles} xtiles, {ytiles} ytiles, and {ztiles} ztiles"
+            f" per channel."
+        )
         self.frame_index = 0  # Reset image index.
         start_time = perf_counter()  # For logging elapsed time.
         # # Setup containers
@@ -329,9 +388,13 @@ class Exaspim(Spim):
             self.sample_pose.move_absolute(self.start_pos)
             self.start_pos = None
         # Reset the starting location.
-        self.sample_pose.zero_in_place('x', 'y', 'z')
+        self.sample_pose.zero_in_place("x", "y", "z")
         # (ytiles-1)*y_grid_step_um
-        self.stage_x_pos_um, self.stage_y_pos_um, self.stage_z_pos_um = (0, 0, 0) # TODO, this changes for reversing tiling
+        self.stage_x_pos_um, self.stage_y_pos_um, self.stage_z_pos_um = (
+            0,
+            0,
+            0,
+        )  # TODO, this changes for reversing tiling
         # Iterate through the volume through z, then x, then y.
         # Play waveforms for the laser, camera trigger, and stage trigger.
         # Capture the fully-formed images as they arrive.
@@ -340,9 +403,10 @@ class Exaspim(Spim):
         try:
             for x in tqdm(range(xtiles), desc="XY Tiling Progress"):
                 self.sample_pose.move_absolute(
-                    x=round(self.stage_x_pos_um * STEPS_PER_UM), wait=True)
+                    x=round(self.stage_x_pos_um * STEPS_PER_UM), wait=True
+                )
                 # self.stage_y_pos_um = 0 # TODO, this changes for reversing tiling
-                self.stage_y_pos_um = (ytiles-1)*y_grid_step_um
+                self.stage_y_pos_um = (ytiles - 1) * y_grid_step_um
                 for y in range(ytiles):
 
                     for ch in channels:
@@ -354,20 +418,25 @@ class Exaspim(Spim):
                         print(self.cfg.get_focus_position(ch))
                         assert self.cfg.get_focus_position(ch) > -1500
                         print(self.cfg.get_focus_position(ch) * STEPS_PER_UM)
-                        self.tigerbox.move_absolute(n=round(self.cfg.get_focus_position(ch) * STEPS_PER_UM))
+                        self.tigerbox.move_absolute(
+                            n=round(self.cfg.get_focus_position(ch) * STEPS_PER_UM)
+                        )
 
                         self.sample_pose.move_absolute(
-                            y=round(self.stage_y_pos_um * STEPS_PER_UM), wait=True)
+                            y=round(self.stage_y_pos_um * STEPS_PER_UM), wait=True
+                        )
 
                         if start_tile_index <= self.curr_tile_index <= end_tile_index:
-                            self.log.info(f"tile: ({x}, {y}); stage_position: "
-                                          f"({self.stage_x_pos_um:.3f}[um], "
-                                          f"{self.stage_y_pos_um:.3f}[um])")
+                            self.log.info(
+                                f"tile: ({x}, {y}); stage_position: "
+                                f"({self.stage_x_pos_um:.3f}[um], "
+                                f"{self.stage_y_pos_um:.3f}[um])"
+                            )
                             stack_prefix = f"{tile_prefix}_x_{x:04}_y_{y:04}_z_0000"
                             # Log stack capture start state.
-                            self.log_stack_acquisition_params(self.curr_tile_index,
-                                                              stack_prefix,
-                                                              z_step_size_um)
+                            self.log_stack_acquisition_params(
+                                self.curr_tile_index, stack_prefix, z_step_size_um
+                            )
                             # TODO, should we do the arithmetic outside of the Camera class?
                             # TODO, should we transfer this small file or just write directly over the network?
                             tile_start = time()
@@ -376,20 +445,38 @@ class Exaspim(Spim):
                             self.log.info("Starting background image.")
                             bkg_img = self.cam.collect_background(frame_average=10)
                             # Save background image TIFF file
-                            tifffile.imwrite(str((deriv_storage_dir / Path(f"bkg_{stack_prefix}_ch_{ch}.tiff")).absolute()), bkg_img, tile=(256, 256))
+                            tifffile.imwrite(
+                                str(
+                                    (
+                                        deriv_storage_dir
+                                        / Path(f"bkg_{stack_prefix}_ch_{ch}.tiff")
+                                    ).absolute()
+                                ),
+                                bkg_img,
+                                tile=(256, 256),
+                            )
                             self.log.info("Completed background image.")
                             self.background_image.clear()
                             # Collect the Z stacks for all channels.
-                            output_filenames = \
-                                self._collect_zstacks([ch], ztiles, z_step_size_um,
-                                                      chunk_size, local_storage_dir,
-                                                      stack_prefix, x, y, do_mip)
+                            output_filenames = self._collect_zstacks(
+                                [ch],
+                                ztiles,
+                                z_step_size_um,
+                                chunk_size,
+                                local_storage_dir,
+                                stack_prefix,
+                                x,
+                                y,
+                                do_mip,
+                            )
                             # Start transferring zstack file to its destination.
                             # Note: Image transfer should be faster than image capture,
                             #   but we still wait for prior processes to finish.
                             if self.stack_transfer_workers:
-                                self.log.info("Waiting for zstack transfer processes "
-                                              "to complete.")
+                                self.log.info(
+                                    "Waiting for zstack transfer processes "
+                                    "to complete."
+                                )
                                 for channel in list(self.stack_transfer_workers.keys()):
                                     worker = self.stack_transfer_workers.pop(channel)
                                     worker.join()
@@ -397,24 +484,36 @@ class Exaspim(Spim):
                             # Bail if we don't need to transfer anything.
                             if img_storage_dir:
                                 for channel, filename in output_filenames.items():
-                                    self.log.info(f"Starting transfer process for {filename}.")
-                                    self.stack_transfer_workers[channel] = \
-                                        FileTransfer(local_storage_dir / filename,
-                                                     img_storage_dir / filename,
-                                                     self.cfg.ftp, self.cfg.ftp_flags)
+                                    self.log.info(
+                                        f"Starting transfer process for {filename}."
+                                    )
+                                    self.stack_transfer_workers[channel] = FileTransfer(
+                                        local_storage_dir / filename,
+                                        img_storage_dir / filename,
+                                        self.cfg.ftp,
+                                        self.cfg.ftp_flags,
+                                    )
                                     self.stack_transfer_workers[channel].start()
                             else:
-                                self.log.info("Skipping file transfer process. File "
-                                              "is already at its destination.")
+                                self.log.info(
+                                    "Skipping file transfer process. File "
+                                    "is already at its destination."
+                                )
                             self.tile_time_s = time() - tile_start
 
                     self.curr_tile_index += 1
-                    self.stage_y_pos_um = self.stage_y_pos_um - y_grid_step_um # TODO, this changes for reversing tiling
-                self.stage_x_pos_um = self.stage_x_pos_um + x_grid_step_um # TODO, this changes for reversing tiling
+                    self.stage_y_pos_um = (
+                        self.stage_y_pos_um - y_grid_step_um
+                    )  # TODO, this changes for reversing tiling
+                self.stage_x_pos_um = (
+                    self.stage_x_pos_um + x_grid_step_um
+                )  # TODO, this changes for reversing tiling
             self.acquiring_images = False
             # Acquisition cleanup.
-            self.log.info(f"Total imaging time: "
-                          f"{(perf_counter() - start_time) / 3600.:.3f} hours.")
+            self.log.info(
+                f"Total imaging time: "
+                f"{(perf_counter() - start_time) / 3600.:.3f} hours."
+            )
         except Exception:
             self.log.exception("Error raised from the main acquisition loop.")
             raise
@@ -422,17 +521,24 @@ class Exaspim(Spim):
             self.sample_pose.move_absolute(x=0, y=0, wait=True)
             self.ni.close()
 
-        acquisition_params = {'session_end_time': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-                              'tags': ['schema']}
+        acquisition_params = {
+            "session_end_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "tags": ["schema"],
+        }
         self.log.info("acquisition parameters", extra=acquisition_params)
 
-    def _collect_zstacks(self, channels: list[int], frame_count: int,
-                         z_step_size_um: float, chunk_size: int,
-                         local_storage_dir: Path,
-                         stack_prefix: str,
-                         x_tile_num,
-                         y_tile_num,
-                         do_mip=True):
+    def _collect_zstacks(
+        self,
+        channels: list[int],
+        frame_count: int,
+        z_step_size_um: float,
+        chunk_size: int,
+        local_storage_dir: Path,
+        stack_prefix: str,
+        x_tile_num,
+        y_tile_num,
+        do_mip=True,
+    ):
         """Collect tile stack for every specified channel and write them to
         disk compressed through ImarisWriter.
 
@@ -462,7 +568,9 @@ class Exaspim(Spim):
 
         :return: dict, keyed by channel name, of the filenames written to disk.
         """
-        self.log.debug(f"Stack Capture starting memory usage: {self.get_mem_consumption():.3f}%")
+        self.log.debug(
+            f"Stack Capture starting memory usage: {self.get_mem_consumption():.3f}%"
+        )
         stack_file_names = {}  # names of the files we will create.
         # Flow Control flags.
         capture_successful = False
@@ -472,52 +580,72 @@ class Exaspim(Spim):
         self.log.debug("Applying extra move to take out backlash.")
         self.sample_pose.move_absolute(z=round(z_backup_pos))
         self.sample_pose.move_absolute(z=round(stage_z_pos))
-        self.sample_pose.setup_ext_trigger_linear_move('z', frame_count,
-                                                       z_step_size_um / 1.0e3)
+        self.sample_pose.setup_ext_trigger_linear_move(
+            "z", frame_count, z_step_size_um / 1.0e3
+        )
         # Allocate shard memory and create StackWriter per-channel.
         for ch in channels:
             stack_file_names[ch] = f"{stack_prefix}_ch_{ch}.ims"
-            mem_shape = (chunk_size,
-                         self.cfg.sensor_row_count,
-                         self.cfg.sensor_column_count)
-            self.img_buffers[ch] = SharedDoubleBuffer(mem_shape,
-                                                      dtype=self.cfg.datatype)
-            chunk_dim_order = ('z', 'y', 'x')  # must agree with mem_shape
+            mem_shape = (
+                chunk_size,
+                self.cfg.sensor_row_count,
+                self.cfg.sensor_column_count,
+            )
+            self.img_buffers[ch] = SharedDoubleBuffer(
+                mem_shape, dtype=self.cfg.datatype
+            )
+            chunk_dim_order = ("z", "y", "x")  # must agree with mem_shape
             if local_storage_dir is not None:
                 self.log.debug(f"Creating StackWriter for {ch}[nm] channel.")
-                self.stack_writer_workers[ch] = \
-                    StackWriter(self.cfg.sensor_row_count,
-                                self.cfg.sensor_column_count,
-                                frame_count, self.stage_x_pos_um, self.stage_y_pos_um,
-                                self.cfg.x_voxel_size_um, self.cfg.y_voxel_size_um,
-                                self.cfg.z_step_size_um,
-                                self.cfg.compressor_chunk_size,
-                                chunk_dim_order,
-                                self.cfg.compressor_thread_count,
-                                self.cfg.compressor_style,
-                                self.cfg.datatype, local_storage_dir,
-                                stack_file_names[ch], str(ch),
-                                self.cfg.channel_specs[str(ch)]['hex_color'])
+                self.stack_writer_workers[ch] = StackWriter(
+                    self.cfg.sensor_row_count,
+                    self.cfg.sensor_column_count,
+                    frame_count,
+                    self.stage_x_pos_um,
+                    self.stage_y_pos_um,
+                    self.cfg.x_voxel_size_um,
+                    self.cfg.y_voxel_size_um,
+                    self.cfg.z_step_size_um,
+                    self.cfg.compressor_chunk_size,
+                    chunk_dim_order,
+                    self.cfg.compressor_thread_count,
+                    self.cfg.compressor_style,
+                    self.cfg.datatype,
+                    local_storage_dir,
+                    stack_file_names[ch],
+                    str(ch),
+                    self.cfg.channel_specs[str(ch)]["hex_color"],
+                )
                 self.stack_writer_workers[ch].start()
 
             # Setup MIP process if specified to do so.
             if do_mip:
                 img_shape = (self.cfg.sensor_row_count, self.cfg.sensor_column_count)
-                img_bytes = int(np.prod(img_shape, dtype=np.int64) * np.dtype(self.cfg.image_dtype).itemsize)
+                img_bytes = int(
+                    np.prod(img_shape, dtype=np.int64)
+                    * np.dtype(self.cfg.image_dtype).itemsize
+                )
                 for ch in channels:
                     # Allocate shared memory location for latest image for mip process.
                     self.mip_images_shm[ch] = SharedMemory(create=True, size=img_bytes)
-                    self.mip_images[ch] = np.ndarray(img_shape, dtype=self.cfg.image_dtype,
-                                                   buffer=self.mip_images_shm[ch].buf)
+                    self.mip_images[ch] = np.ndarray(
+                        img_shape,
+                        dtype=self.cfg.image_dtype,
+                        buffer=self.mip_images_shm[ch].buf,
+                    )
                     # Mip process will use img_buffers.write_buf to access latest image
                     # Create the process.
-                    self.mip_processes[ch] = MIPProcessor(x_tile_num, y_tile_num, frame_count,
-                                                          self.cfg.sensor_row_count,
-                                                          self.cfg.sensor_column_count,
-                                                          self.cfg.image_dtype,
-                                                          self.mip_images_shm[ch].name,
-                                                          self.deriv_storage_dir,
-                                                          int(ch))
+                    self.mip_processes[ch] = MIPProcessor(
+                        x_tile_num,
+                        y_tile_num,
+                        frame_count,
+                        self.cfg.sensor_row_count,
+                        self.cfg.sensor_column_count,
+                        self.cfg.image_dtype,
+                        self.mip_images_shm[ch].name,
+                        self.deriv_storage_dir,
+                        int(ch),
+                    )
                     self.mip_processes[ch].more_images.set()
                     self.mip_processes[ch].start()
 
@@ -526,7 +654,9 @@ class Exaspim(Spim):
         remainder = frame_count % chunk_size
         last_chunk_size = chunk_size if not remainder else remainder
         start_time = perf_counter()
-        self.cam.start(len(channels) * frame_count, live=False)  # TODO: rewrite to block until ready.
+        self.cam.start(
+            len(channels) * frame_count, live=False
+        )  # TODO: rewrite to block until ready.
         try:
             # Images arrive serialized in repeating channel order.
             for stack_index in tqdm(range(frame_count), desc="ZStack progress"):
@@ -535,27 +665,38 @@ class Exaspim(Spim):
                 if chunk_index == 0:
                     chunks_filled = floor(stack_index / chunk_size)
                     remaining_chunks = chunk_count - chunks_filled
-                    num_pulses = last_chunk_size if remaining_chunks == 1 else chunk_size
+                    num_pulses = (
+                        last_chunk_size if remaining_chunks == 1 else chunk_size
+                    )
                     self.log.debug(f"Grabbing chunk {chunks_filled + 1}/{chunk_count}")
-                    self.log.debug(f"Current memory usage: {self.get_mem_consumption():.3f}%")
+                    self.log.debug(
+                        f"Current memory usage: {self.get_mem_consumption():.3f}%"
+                    )
                     self.ni.set_pulse_count(num_pulses)
                     self.ni.start()
                 # Deserialize camera input into corresponding channel.
                 for ch_index in channels:
-                    self.log.debug(f"Grabbing frame "
-                                   f"{stack_index + 1:9}/{frame_count} for "
-                                   f"{ch_index}[nm] channel.")
-                    self.img_buffers[ch_index].write_buf[chunk_index] = \
-                        self.cam.grab_frame()
+                    self.log.debug(
+                        f"Grabbing frame "
+                        f"{stack_index + 1:9}/{frame_count} for "
+                        f"{ch_index}[nm] channel."
+                    )
+                    self.img_buffers[ch_index].write_buf[
+                        chunk_index
+                    ] = self.cam.grab_frame()
 
                     # Also write a copy of the latest image to a location where
                     # the MIP processor can process it.
                     # First make sure that the mip process isn't using previous
                     # image. (Should never block, but safeguard it anyways.)
-                    while any([mp.new_image.is_set() for mp in self.mip_processes.values()]):
+                    while any(
+                        [mp.new_image.is_set() for mp in self.mip_processes.values()]
+                    ):
                         pass
                     # Only copies array into shared memory if brackets are there
-                    self.mip_images[ch_index][:,:] = self.img_buffers[ch_index].write_buf[chunk_index][:,:]
+                    self.mip_images[ch_index][:, :] = self.img_buffers[
+                        ch_index
+                    ].write_buf[chunk_index][:, :]
                     self.mip_processes[ch_index].new_image.set()
                     self._check_camera_acquisition_state()
                 # Save the index of the most-recently captured frame to
@@ -571,8 +712,9 @@ class Exaspim(Spim):
 
                     if not self._all_stack_workers_idle():
                         final = "final " if stack_index == last_frame_index else ""
-                        self.log.warning(f"Waiting for {final}chunk to be "
-                                         f"compressed to disk.")
+                        self.log.warning(
+                            f"Waiting for {final}chunk to be " f"compressed to disk."
+                        )
                     while not self._all_stack_workers_idle():
                         sleep(0.001)
                     # Dispatch chunk to each StackWriter compression process.
@@ -590,12 +732,15 @@ class Exaspim(Spim):
                         for ch_index in channels:
                             self.img_buffers[ch_index].toggle_buffers()
                             if local_storage_dir is not None:
-                                self.stack_writer_workers[ch_index].shm_name = \
+                                self.stack_writer_workers[ch_index].shm_name = (
                                     self.img_buffers[ch_index].read_buf_mem_name
+                                )
                                 self.stack_writer_workers[ch_index].done_reading.clear()
             capture_successful = True
-            self.log.debug(f"Stack imaging time: "
-                           f"{(perf_counter() - start_time) / 3600.:.3f} hours.")
+            self.log.debug(
+                f"Stack imaging time: "
+                f"{(perf_counter() - start_time) / 3600.:.3f} hours."
+            )
         except Exception:
             self.log.exception("Error raised from the stack acquisition loop.")
             raise
@@ -629,18 +774,22 @@ class Exaspim(Spim):
             self.log.debug("Applying extra move to take out backlash.")
             self.sample_pose.move_absolute(z=round(z_backup_pos))
             self.sample_pose.move_absolute(z=0)
-            self.log.debug(f"Stack Capture ending memory usage: {self.get_mem_consumption():.3f}%")
+            self.log.debug(
+                f"Stack Capture ending memory usage: {self.get_mem_consumption():.3f}%"
+            )
 
         return stack_file_names
+
     def _all_stack_workers_idle(self):
         """Helper function. True if all StackWriters are idle."""
-        return all([w.done_reading.is_set()
-                    for _, w in self.stack_writer_workers.items()])
+        return all(
+            [w.done_reading.is_set() for _, w in self.stack_writer_workers.items()]
+        )
 
     def _check_camera_acquisition_state(self):
         """Get the current eGrabber state. Raise a runtime error if we drop frames."""
         state = self.cam.get_camera_acquisition_state()  # logs it.
-        if state['dropped_frames'] > 0:
+        if state["dropped_frames"] > 0:
             msg = "Acquisition loop has dropped a frame."
             self.log.error(msg)
             raise RuntimeError(msg)
@@ -672,18 +821,22 @@ class Exaspim(Spim):
         # Return a dummy image if none are available.
         channel_id = 0
         if self.scout_mode:
-            sleep(self.cfg.get_channel_cycle_time(488)) # Hack
+            sleep(self.cfg.get_channel_cycle_time(488))  # Hack
             self.ni.stop()
 
         # while True:
         #     if self.livestream_enabled.is_set() or self.acquiring_images and self.active_lasers is not None:
         while self.livestream_enabled.is_set() or self.acquiring_images:
             if self.active_lasers is not None:
-                channel_id = (channel_id + 1) % len(self.active_lasers) if len(self.active_lasers) != 1 else 0
-                yield self.get_latest_image(self.active_lasers[channel_id]), self.active_lasers[channel_id]
-            yield#sleep((1 / self.cfg.daq_obj_kwds['livestream_frequency_hz']))
-
-
+                channel_id = (
+                    (channel_id + 1) % len(self.active_lasers)
+                    if len(self.active_lasers) != 1
+                    else 0
+                )
+                yield self.get_latest_image(
+                    self.active_lasers[channel_id]
+                ), self.active_lasers[channel_id]
+            yield  # sleep((1 / self.cfg.daq_obj_kwds['livestream_frequency_hz']))
 
     def stop_livestream(self):
         # Bail early if it's already stopped.
@@ -705,7 +858,6 @@ class Exaspim(Spim):
         self.sample_pose.unlock_external_user_input()
 
     def set_scan_start(self, coords):
-
         """Set start position of scan. Stage will move to coords via sample pose
         at begining of scan"""
         # FIXME: we should pass a starting position into collect_volumetric_image.
@@ -719,26 +871,44 @@ class Exaspim(Spim):
         """
         img_buffer = self.img_buffers.get(channel, None)  # Not None during acquisition.
 
-        if img_buffer and self.prev_frame_chunk_index is not None and self.acquiring_images:
+        if (
+            img_buffer
+            and self.prev_frame_chunk_index is not None
+            and self.acquiring_images
+        ):
             # Only access buffer if it isn't being toggled.
             with self.chunk_lock:
-                self.log.debug('Calling downsample from get_latest_image')
+                self.log.debug("Calling downsample from get_latest_image")
                 try:
-                    return self.downsampler.compute(self.img_buffers[channel].write_buf[self.prev_frame_chunk_index])
+                    return self.downsampler.compute(
+                        self.img_buffers[channel].write_buf[self.prev_frame_chunk_index]
+                    )
                 except:
                     return None
 
         # Return a dummy image if none are available.
-        if not img_buffer or self.prev_frame_chunk_index is None or not self.acquiring_images:
+        if (
+            not img_buffer
+            or self.prev_frame_chunk_index is None
+            or not self.acquiring_images
+        ):
             try:
                 if self.livestream_enabled.is_set():
                     # return self.downsampler.compute(np.clip(self.cam.grab_frame()-self.bkg_image+100, 100, 2**16-1)-100)
                     return self.downsampler.compute(self.cam.grab_frame())
                 elif self.simulated:
                     # Display "white noise" if no image is available.
-                    return self.downsampler.compute(np.random.randint(0, 255, size=(self.cfg.sensor_row_count,
-                                                                                    self.cfg.sensor_column_count),
-                                                                      dtype=self.cfg.image_dtype))
+                    return self.downsampler.compute(
+                        np.random.randint(
+                            0,
+                            255,
+                            size=(
+                                self.cfg.sensor_row_count,
+                                self.cfg.sensor_column_count,
+                            ),
+                            dtype=self.cfg.image_dtype,
+                        )
+                    )
             except:
                 return None
 
@@ -763,74 +933,87 @@ class Exaspim(Spim):
         # TODO: power down hardware.
         super().close()  # Call this last.
 
-    def log_stack_acquisition_params(self, curr_tile_index, stack_prefix,
-                                     z_step_size_um):
+    def log_stack_acquisition_params(
+        self, curr_tile_index, stack_prefix, z_step_size_um
+    ):
         """helper function in main acquisition loop to log the current state
         before capturing a stack of images per channel."""
         for laser in self.active_lasers:
-            tile_schema_params = \
-                {
-                    'tile_number': curr_tile_index,
-                    'file_name': f'{stack_prefix}_ch_{laser}.ims',
-                    'coordinate_transformations': [
-                        {'scale': [self.cfg.tile_size_x_um / self.cfg.sensor_column_count,
-                                   self.cfg.tile_size_y_um / self.cfg.sensor_row_count,
-                                   z_step_size_um]},
-                        {'translation': [self.stage_x_pos_um * 0.001,
-                                         self.stage_y_pos_um * 0.001,
-                                         self.stage_z_pos_um * 0.001]}
-                    ],
-                    'channel': {'channel_name': str(laser),
-                                'light_source_name': str(laser),
-                                'excitation_wavelength': str(laser),
-                                'excitation_power': '1000.0',
-                                'filter_wheel_index': 0,
-                                'filter_names': [],
-                                'detector_name': '',
-                                },
-                    'channel_name': f'{laser}',
-                    'x_voxel_size': self.cfg.tile_size_x_um / self.cfg.sensor_column_count,
-                    'y_voxel_size': self.cfg.tile_size_y_um / self.cfg.sensor_row_count,
-                    'z_voxel_size': z_step_size_um,
-                    'voxel_size_units': 'micrometers',
-                    'tile_x_position': self.stage_x_pos_um * 0.001,
-                    'tile_y_position': self.stage_y_pos_um * 0.001,
-                    'tile_z_position': self.stage_z_pos_um * 0.001,
-                    'tile_position_units': 'millimeters',
-                    'lightsheet_angle': 0,
-                    'lightsheet_angle_units': 'degrees',
-                    'laser_wavelength': str(laser),
-                    'laser_wavelength_units': "nanometers",
-                    'laser_power': 2000,
-                    'laser_power_units': 'milliwatts',
-                    'filter_wheel_index': 0,
-                    'tags': ['schema']
-                }
-            self.log.info('tile data', extra=tile_schema_params)
+            tile_schema_params = {
+                "tile_number": curr_tile_index,
+                "file_name": f"{stack_prefix}_ch_{laser}.ims",
+                "coordinate_transformations": [
+                    {
+                        "scale": [
+                            self.cfg.tile_size_x_um / self.cfg.sensor_column_count,
+                            self.cfg.tile_size_y_um / self.cfg.sensor_row_count,
+                            z_step_size_um,
+                        ]
+                    },
+                    {
+                        "translation": [
+                            self.stage_x_pos_um * 0.001,
+                            self.stage_y_pos_um * 0.001,
+                            self.stage_z_pos_um * 0.001,
+                        ]
+                    },
+                ],
+                "channel": {
+                    "channel_name": str(laser),
+                    "light_source_name": str(laser),
+                    "excitation_wavelength": str(laser),
+                    "excitation_power": "1000.0",
+                    "filter_wheel_index": 0,
+                    "filter_names": [],
+                    "detector_name": "",
+                },
+                "channel_name": f"{laser}",
+                "x_voxel_size": self.cfg.tile_size_x_um / self.cfg.sensor_column_count,
+                "y_voxel_size": self.cfg.tile_size_y_um / self.cfg.sensor_row_count,
+                "z_voxel_size": z_step_size_um,
+                "voxel_size_units": "micrometers",
+                "tile_x_position": self.stage_x_pos_um * 0.001,
+                "tile_y_position": self.stage_y_pos_um * 0.001,
+                "tile_z_position": self.stage_z_pos_um * 0.001,
+                "tile_position_units": "millimeters",
+                "lightsheet_angle": 0,
+                "lightsheet_angle_units": "degrees",
+                "laser_wavelength": str(laser),
+                "laser_wavelength_units": "nanometers",
+                "laser_power": 2000,
+                "laser_power_units": "milliwatts",
+                "filter_wheel_index": 0,
+                "tags": ["schema"],
+            }
+            self.log.info("tile data", extra=tile_schema_params)
         # Log system states.
-        system_schema_data = \
-            {
-                'etl_temperature': -1, # self.tigerbox.get_etl_temp('V'),  # FIXME: this is hardcoded as V axis
-                'etl_temperature_units': 'C',
-                'camera_board_temperature': self.cam.get_mainboard_temperature(),
-                'camera_board_temperature_units': 'C',
-                'sensor_temperature': self.cam.get_sensor_temperature(),
-                'sensor_temperature_units': 'C',
-                'tags': ['schema']
-            }
-        settings_schema_data = \
-            {
-                'tags': ['schema']
-            }
-        self.log.info('system state', extra=system_schema_data)
+        system_schema_data = {
+            "etl_temperature": -1,  # self.tigerbox.get_etl_temp('V'),  # FIXME: this is hardcoded as V axis
+            "etl_temperature_units": "C",
+            "camera_board_temperature": self.cam.get_mainboard_temperature(),
+            "camera_board_temperature_units": "C",
+            "sensor_temperature": self.cam.get_sensor_temperature(),
+            "sensor_temperature_units": "C",
+            "tags": ["schema"],
+        }
+        settings_schema_data = {"tags": ["schema"]}
+        self.log.info("system state", extra=system_schema_data)
         # Log settings per laser channel.
         for laser in self.active_lasers:
             laser = str(laser)
-            for key in self.cfg.channel_specs[laser]['etl']:
-                settings_schema_data[f'daq_etl {key}'] = f'{self.cfg.channel_specs[laser]["etl"][key]}'
-            for key in self.cfg.channel_specs[laser]['galvo_a']:
-                settings_schema_data[f'daq_galvo_a {key}'] = f'{self.cfg.channel_specs[laser]["galvo_a"][key]}'
-            for key in self.cfg.channel_specs[laser]['galvo_b']:
-                settings_schema_data[f'daq_galvo_b {key}'] = f'{self.cfg.channel_specs[laser]["galvo_b"][key]}'
-            self.log.info(f'laser channel {laser} acquisition settings',
-                          extra=settings_schema_data)
+            for key in self.cfg.channel_specs[laser]["etl"]:
+                settings_schema_data[f"daq_etl {key}"] = (
+                    f'{self.cfg.channel_specs[laser]["etl"][key]}'
+                )
+            for key in self.cfg.channel_specs[laser]["galvo_a"]:
+                settings_schema_data[f"daq_galvo_a {key}"] = (
+                    f'{self.cfg.channel_specs[laser]["galvo_a"][key]}'
+                )
+            for key in self.cfg.channel_specs[laser]["galvo_b"]:
+                settings_schema_data[f"daq_galvo_b {key}"] = (
+                    f'{self.cfg.channel_specs[laser]["galvo_b"][key]}'
+                )
+            self.log.info(
+                f"laser channel {laser} acquisition settings",
+                extra=settings_schema_data,
+            )
