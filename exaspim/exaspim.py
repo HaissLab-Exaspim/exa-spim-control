@@ -52,9 +52,14 @@ class Exaspim(Spim):
         self.gavlo_a = None
         self.gavlo_b = None
         self.daq = None
-        self.tigerbox = TigerController(**self.cfg.tiger_obj_kwds) if not \
-            self.simulated else SimTiger(**self.cfg.tiger_obj_kwds,
-                                         build_config={'Motor Axes': ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']})
+
+        if self.cfg.tiger_obj_kwds.get("simulated", False) or self.simulated:
+            self.tigerbox = SimTiger(
+                **self.cfg.tiger_obj_kwds,
+                build_config={'Motor Axes': ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']})
+        else :
+            self.tigerbox = TigerController(**self.cfg.tiger_obj_kwds)
+
         self.sample_pose = SamplePose(self.tigerbox,
                                       **self.cfg.sample_pose_kwds)
         # Extra Internal State attributes for the current image capture
