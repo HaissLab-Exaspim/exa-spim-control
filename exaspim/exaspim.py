@@ -58,7 +58,7 @@ class Exaspim(Spim):
             print("HERE")
             self.tigerbox = SimTiger(
                 **self.cfg.motion_control["driver_kwds"],
-                build_config={"Motor Axes": ["X", "Y", "Z"]},
+                build_config={"Motor Axes": ["X", "Y", "Z", "N"]},
             )
             # ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']
         else:
