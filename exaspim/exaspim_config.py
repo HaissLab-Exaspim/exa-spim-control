@@ -24,8 +24,8 @@ class ExaspimConfig(SpimConfig):
         # Keyword arguments for instantiating objects.
         self.joystick_kwds = self.cfg['joystick_kwds']
         self.sample_pose_kwds = self.cfg['sample_pose_kwds']
-        self.tiger_obj_kwds = self.cfg['tiger_controller_driver_kwds']
-        self.motion_control_specs = self.cfg['motion_control_specs']
+        self.motion_control_kwds = self.cfg['motion_control_kwds']
+        self.motion_control = self.cfg['motion_control']
         # Other obj kwds are generated dynamically.
 
     # Per-channel getter methods.

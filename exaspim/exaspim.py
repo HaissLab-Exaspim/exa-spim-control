@@ -53,12 +53,12 @@ class Exaspim(Spim):
         self.gavlo_b = None
         self.daq = None
 
-        if self.cfg.motion_control_specs.get("simulated", False) or self.simulated:
+        if self.cfg.motion_control.get("simulated", False) or self.simulated:
             self.tigerbox = SimTiger(
-                **self.cfg.tiger_obj_kwds,
+                **self.cfg.motion_control_kwds,
                 build_config={'Motor Axes': ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']})
         else :
-            self.tigerbox = TigerController(**self.cfg.tiger_obj_kwds)
+            self.tigerbox = TigerController(**self.cfg.motion_control_kwds)
 
         self.sample_pose = SamplePose(self.tigerbox,
                                       **self.cfg.sample_pose_kwds)
@@ -204,8 +204,8 @@ class Exaspim(Spim):
             self.start_livestream(active_lasers)  # reapplies waveform settings.
 
     def log_system_metadata(self):
-        # log tiger settings
-        self.log.info('tiger motorized axes parameters',
+        # log motion control settings
+        self.log.info('motion control motorized axes parameters',
                       extra={'tags': ['schema']})
         build_config = self.tigerbox.get_build_config()
         self.log.debug(f'{build_config}')
