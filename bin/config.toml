@@ -57,7 +57,10 @@ backlash_reset_distance_um = 4
 dev_name = "Dev2"
 samples_per_sec = 10000.0
 
-[tiger_controller_driver_kwds]
+[motion_control]
+simulated = true
+
+[motion_control.driver_kwds]
 com_port = "COM3"
 
 [estimates]
