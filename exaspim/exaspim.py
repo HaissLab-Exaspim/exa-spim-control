@@ -53,7 +53,7 @@ class Exaspim(Spim):
         self.gavlo_b = None
         self.daq = None
 
-        if self.cfg.tiger_obj_kwds.get("simulated", False) or self.simulated:
+        if self.cfg.motion_control_specs.get("simulated", False) or self.simulated:
             self.tigerbox = SimTiger(
                 **self.cfg.tiger_obj_kwds,
                 build_config={'Motor Axes': ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']})
