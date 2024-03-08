@@ -55,10 +55,10 @@ class Exaspim(Spim):
 
         if self.cfg.motion_control.get("simulated", False) or self.simulated:
             self.tigerbox = SimTiger(
-                **self.cfg.motion_control.driver_kwds,
+                **self.cfg.motion_control["driver_kwds"],
                 build_config={'Motor Axes': ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']})
         else :
-            self.tigerbox = TigerController(**self.cfg.motion_control.driver_kwds)
+            self.tigerbox = TigerController(**self.cfg.motion_control["driver_kwds"])
 
         self.sample_pose = SamplePose(self.tigerbox,
                                       **self.cfg.sample_pose_kwds)
