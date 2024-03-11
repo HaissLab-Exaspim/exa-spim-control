@@ -127,11 +127,11 @@ class Exaspim(Spim):
     def _setup_lasers(self):
         """Setup lasers that will be used for imaging. Warm them up, etc."""
 
-        self.log.debug(f"Setting up lasers")
+        self.log.debug("Setting up lasers")
         for wl, specs in self.cfg.channel_specs.items():
             if "port" in specs["kwds"].keys() and specs["kwds"]["port"] == "COMxx":
-                self.log.warning(
-                    f"Skipping setup for laser {wl} due to no COM port specified"
+                self.log.error(
+                    f"Skipping setup for laser {wl} due to no COM port specified !"
                 )
                 continue
             __import__(specs["driver"])
@@ -139,10 +139,19 @@ class Exaspim(Spim):
             kwds = dict(specs["kwds"])
             for k, v in kwds.items():
                 if str(v).split(".")[0] in dir(sys.modules[specs["driver"]]):
+                    # i guess this case was for oxxius configs
+
                     arg_class = getattr(sys.modules[specs["driver"]], v.split(".")[0])
                     kwds[k] = getattr(arg_class, ".".join(v.split(".")[1:]))
+                    self.log.debug(
+                        f"Added laser keword argument 'class-style' : {k}:{kwds[k]} from module's arg_class {arg_class}"
+                    )
                 else:
+                    # if self.cfg is
                     kwds[k] = eval(v) if "." in str(v) else v
+                    self.log.debug(
+                        f"Added laser argument 'dictionnary-style' {k}:{kwds[k]}"
+                    )
 
             self.lasers[wl] = laser_class(**kwds) if not self.simulated else Mock()
             self.log.debug(f"Successfully setup {wl} laser")
@@ -195,7 +204,10 @@ class Exaspim(Spim):
         self.active_lasers = wavelengths
         self.log.info("Generating waveforms.")
         voltages_t = generate_waveforms(
-            self.cfg, plot=False, channels=self.active_lasers, live=live
+            self.cfg,
+            plot=bool(self.cfg.debug.get("plot_waveforms", False)),
+            channels=self.active_lasers,
+            live=live,
         )
         print(voltages_t.shape)
         self.log.info("Writing waveforms to hardware.")
@@ -883,7 +895,7 @@ class Exaspim(Spim):
                     return self.downsampler.compute(
                         self.img_buffers[channel].write_buf[self.prev_frame_chunk_index]
                     )
-                except:
+                except Exception as e:
                     return None
 
         # Return a dummy image if none are available.
@@ -894,7 +906,9 @@ class Exaspim(Spim):
         ):
             try:
                 if self.livestream_enabled.is_set():
-                    # return self.downsampler.compute(np.clip(self.cam.grab_frame()-self.bkg_image+100, 100, 2**16-1)-100)
+                    # return self.downsampler.compute(
+                    # np.clip(self.cam.grab_frame()-self.bkg_image+100, 100, 2**16-1)-100
+                    # )
                     return self.downsampler.compute(self.cam.grab_frame())
                 elif self.simulated:
                     # Display "white noise" if no image is available.
@@ -909,7 +923,7 @@ class Exaspim(Spim):
                             dtype=self.cfg.image_dtype,
                         )
                     )
-            except:
+            except Exception as e:
                 return None
 
     def get_mem_consumption(self):

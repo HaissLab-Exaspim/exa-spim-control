@@ -13,144 +13,151 @@ class ExaspimConfig(SpimConfig):
         super().__init__(toml_filepath, TomlTemplate)
 
         # Make references to mutable objects.
-        self.experiment_specs = self.cfg['experiment_specs']
-        self.waveform_specs = self.cfg['waveform_specs']
-        self.compressor_specs = self.cfg['compressor_specs']
-        self.file_transfer_specs = self.cfg['file_transfer_specs']
-        self.stage_specs = self.cfg['sample_stage_specs']
-        self.channel_specs = self.cfg['channel_specs']
-        self.camera_specs = self.cfg['camera_specs']
+        self.experiment_specs = self.cfg["experiment_specs"]
+        self.waveform_specs = self.cfg["waveform_specs"]
+        self.compressor_specs = self.cfg["compressor_specs"]
+        self.file_transfer_specs = self.cfg["file_transfer_specs"]
+        self.stage_specs = self.cfg["sample_stage_specs"]
+        self.channel_specs = self.cfg["channel_specs"]
+        self.camera_specs = self.cfg["camera_specs"]
 
         # Keyword arguments for instantiating objects.
-        self.joystick_kwds = self.cfg['joystick_kwds']
-        self.sample_pose_kwds = self.cfg['sample_pose_kwds']
-        self.motion_control = self.cfg['motion_control']
+        self.joystick_kwds = self.cfg["joystick_kwds"]
+        self.sample_pose_kwds = self.cfg["sample_pose_kwds"]
+        self.motion_control = self.cfg["motion_control"]
         # Other obj kwds are generated dynamically.
+
+        self.debug = self.cfg.get("debug", {})
 
     # Per-channel getter methods.
     def get_channel_cycle_time(self, wavelength: int):
         """Returns required time to play a waveform period for a given channel."""
-        return self.camera_exposure_time \
-               + self.get_etl_buffer_time(wavelength) \
-               + self.frame_rest_time \
-               + self.camera_dwell_time
+        return (
+            self.camera_exposure_time
+            + self.get_etl_buffer_time(wavelength)
+            + self.frame_rest_time
+            + self.camera_dwell_time
+        )
 
     def get_focus_position(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['focus']['position']
+        return self.channel_specs[str(wavelength)]["focus"]["position"]
 
     def get_camera_delay_time(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['camera']['delay_time_s']
+        return self.channel_specs[str(wavelength)]["camera"]["delay_time_s"]
 
     def get_etl_amplitude(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['etl']['amplitude']
+        return self.channel_specs[str(wavelength)]["etl"]["amplitude"]
 
     def get_galvo_a_setpoint(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['galvo_a']['setpoint']
+        return self.channel_specs[str(wavelength)]["galvo_a"]["setpoint"]
 
     def get_galvo_b_setpoint(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['galvo_b']['setpoint']
+        return self.channel_specs[str(wavelength)]["galvo_b"]["setpoint"]
 
     def get_etl_offset(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['etl']['offset']
+        return self.channel_specs[str(wavelength)]["etl"]["offset"]
 
     def get_etl_nonlinear(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['etl']['nonlinear']
+        return self.channel_specs[str(wavelength)]["etl"]["nonlinear"]
 
     def get_etl_interp_time(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['etl']['interp_time_s']
+        return self.channel_specs[str(wavelength)]["etl"]["interp_time_s"]
 
     def get_etl_buffer_time(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]['etl']['buffer_time_s']
+        return self.channel_specs[str(wavelength)]["etl"]["buffer_time_s"]
 
     # Channel Specs
     def get_channel_ao_voltage(self, wl):
-        return self.channel_specs[wl]['ao_voltage']
+        return self.channel_specs[wl]["ao_voltage"]
 
     def set_channel_ao_voltage(self, wl, value):
 
-        self.channel_specs[wl]['ao_voltage'] = value
+        self.channel_specs[wl]["ao_voltage"] = value
 
     # Waveform Specs
     @property
     def ttl_pulse_time(self):
-        return self.waveform_specs['ttl_pulse_time_s']
+        return self.waveform_specs["ttl_pulse_time_s"]
 
     @ttl_pulse_time.setter
     def ttl_pulse_time(self, seconds):
         """The "on-period" length of an external TTL trigger pulse."""
-        self.waveform_specs['ttl_pulse_time_s'] = seconds
+        self.waveform_specs["ttl_pulse_time_s"] = seconds
 
     @property
     def frame_rest_time(self):
-        return self.waveform_specs['frame_rest_time_s']
+        return self.waveform_specs["frame_rest_time_s"]
 
     @frame_rest_time.setter
     def frame_rest_time(self, seconds):
         """The rest time in between frames for the ETL to snap back to its
         starting position."""
-        self.waveform_specs['frame_rest_time_s'] = seconds
+        self.waveform_specs["frame_rest_time_s"] = seconds
 
     # Experiment Specs
 
     @property
     def experimenters_name(self):
-        return self.experiment_specs['experimenters_name']
+        return self.experiment_specs["experimenters_name"]
 
     @experimenters_name.setter
     def experimenters_name(self, name: str):
-        self.experiment_specs['experimenters_name'] = name
+        self.experiment_specs["experimenters_name"] = name
 
     @property
     def immersion_medium(self):
-        return self.experiment_specs['immersion_medium']
+        return self.experiment_specs["immersion_medium"]
 
     @immersion_medium.setter
     def immersion_medium(self, medium: str):
-        self.experiment_specs['immersion_medium'] = medium
+        self.experiment_specs["immersion_medium"] = medium
 
     @property
     def immersion_medium_refractive_index(self):
-        return self.experiment_specs['immersion_medium_refractive_index']
+        return self.experiment_specs["immersion_medium_refractive_index"]
 
     @immersion_medium_refractive_index.setter
     def immersion_medium_refractive_index(self, ri: float):
-        self.experiment_specs['immersion_medium_refractive_index'] = ri
+        self.experiment_specs["immersion_medium_refractive_index"] = ri
 
     @property
     def x_anatomical_direction(self):
         """Anatomical orientation along x"""
-        return self.experiment_specs['x_anatomical_direction']
+        return self.experiment_specs["x_anatomical_direction"]
 
     @x_anatomical_direction.setter
     def x_anatomical_direction(self, direction):
         """Anatomical orientation along x"""
-        self.experiment_specs['x_anatomical_direction'] = direction
+        self.experiment_specs["x_anatomical_direction"] = direction
+
     @property
     def y_anatomical_direction(self):
         """Anatomical orientation along y"""
-        return self.experiment_specs['y_anatomical_direction']
+        return self.experiment_specs["y_anatomical_direction"]
 
     @y_anatomical_direction.setter
     def y_anatomical_direction(self, direction):
         """Anatomical orientation along x"""
-        self.experiment_specs['y_anatomical_direction'] = direction
+        self.experiment_specs["y_anatomical_direction"] = direction
+
     @property
     def z_anatomical_direction(self):
         """Anatomical orientation along z"""
-        return self.experiment_specs['z_anatomical_direction']
+        return self.experiment_specs["z_anatomical_direction"]
 
     @z_anatomical_direction.setter
     def z_anatomical_direction(self, direction):
         """Anatomical orientation along x"""
-        self.experiment_specs['z_anatomical_direction'] = direction
+        self.experiment_specs["z_anatomical_direction"] = direction
+
     # Stage Specs
     @property
     def z_step_size_um(self):
-        return self.cfg['imaging_specs']['z_step_size_um']
+        return self.cfg["imaging_specs"]["z_step_size_um"]
 
     @z_step_size_um.setter
     def z_step_size_um(self, um: float):
-        self.cfg['imaging_specs']['z_step_size_um'] = um
+        self.cfg["imaging_specs"]["z_step_size_um"] = um
 
     @property
     def start_tile_index(self):
@@ -162,11 +169,11 @@ class ExaspimConfig(SpimConfig):
         x dimension. i.e: in a grid of 5 xtiles by 3 ytiles, tile "0" is (0, 0),
         tile "2" is (0, 2), tile "3" is (1, 0), etc.
         """
-        return self.imaging_specs.get('start_tile_index', None)
+        return self.imaging_specs.get("start_tile_index", None)
 
     @start_tile_index.setter
     def start_tile_index(self, index: int):
-        self.imaging_specs['start_tile_index'] = index
+        self.imaging_specs["start_tile_index"] = index
 
     @property
     def end_tile_index(self):
@@ -174,64 +181,64 @@ class ExaspimConfig(SpimConfig):
         i.e: the final stack to be collected. (See details on
         :meth:`start_tile_index` for more details on tile indexing.)
         """
-        return self.imaging_specs.get('end_tile_index', None)
+        return self.imaging_specs.get("end_tile_index", None)
 
     @end_tile_index.setter
     def end_tile_index(self, index):
-        self.imaging_specs['end_tile_index'] = index
-        
+        self.imaging_specs["end_tile_index"] = index
+
     @property
     def stage_backlash_reset_dist_um(self):
-        return self.stage_specs['backlash_reset_distance_um']
+        return self.stage_specs["backlash_reset_distance_um"]
 
     @stage_backlash_reset_dist_um.setter
     def stage_backlash_reset_dist_um(self, micrometers: int):
-        self.stage_specs['backlash_reset_distance_um'] = micrometers
+        self.stage_specs["backlash_reset_distance_um"] = micrometers
 
     # Camera Specs
     @property
     def egrabber_frame_buffer(self):
-        return self.camera_specs['egrabber_frame_buffer']
+        return self.camera_specs["egrabber_frame_buffer"]
 
     @egrabber_frame_buffer.setter
     def egrabber_frame_buffer(self, size: int):
-        self.camera_specs['egrabber_frame_buffer'] = size
+        self.camera_specs["egrabber_frame_buffer"] = size
 
     @property  # No setter!
     def camera_line_interval_us(self):
         """Camera Line Interval. Cannot be changed."""
-        return self.camera_specs['line_interval_us']
+        return self.camera_specs["line_interval_us"]
 
     @property
     def slit_width(self):
         """Slit width (in pixels) of the slit that moves along the frame"""
-        return self.design_specs['slit_width_pixels']
+        return self.design_specs["slit_width_pixels"]
 
     @slit_width.setter
     def slit_width(self, pixels):
-        self.design_specs['slit_width_pixels'] = pixels
+        self.design_specs["slit_width_pixels"] = pixels
 
     @property
     def camera_digital_gain(self):
-        return self.camera_specs['digital_gain_adu']
+        return self.camera_specs["digital_gain_adu"]
 
     @camera_digital_gain.setter
     def camera_digital_gain(self, adu: float):
-        self.camera_specs['digital_gain_adu'] = adu
+        self.camera_specs["digital_gain_adu"] = adu
 
     # Compressor Specs
     @property
     def compressor_style(self):
-        return self.compressor_specs['compression_style']
+        return self.compressor_specs["compression_style"]
 
     @property
     def compressor_thread_count(self):
-        return self.compressor_specs['compressor_thread_count']
+        return self.compressor_specs["compressor_thread_count"]
 
     @property
     def compressor_chunk_size(self):
         """number of images in a chunk to be compressed at a time."""
-        return self.compressor_specs['image_stack_chunk_size']
+        return self.compressor_specs["image_stack_chunk_size"]
 
     # @property
     # def memento_path(self) -> Path:
@@ -244,51 +251,51 @@ class ExaspimConfig(SpimConfig):
     # Tile Specs
     @property
     def datatype(self) -> str:
-        return self.tile_specs['data_type']
+        return self.tile_specs["data_type"]
 
     @datatype.setter
     def datatype(self, numpy_datatype: str):
-        self.tile_specs['data_type'] = numpy_datatype
+        self.tile_specs["data_type"] = numpy_datatype
 
     # File Transfer Specs
     @property
     def ftp(self) -> str:
-        return self.file_transfer_specs['protocol']
+        return self.file_transfer_specs["protocol"]
 
     @ftp.setter
     def ftp(self, protocol: str):
-        self.file_transfer_specs['protocol'] = protocol
+        self.file_transfer_specs["protocol"] = protocol
 
     @property
     def ftp_flags(self) -> str:
-        return self.file_transfer_specs['protocol_flags']
+        return self.file_transfer_specs["protocol_flags"]
 
     @ftp_flags.setter
     def ftp_flags(self, flags: str):
-        self.file_transfer_specs['protocol_flags'] = flags
+        self.file_transfer_specs["protocol_flags"] = flags
 
     # Daq Specs
     @property
     def daq_sample_rate(self):
-        return self.daq_obj_kwds['samples_per_sec']
+        return self.daq_obj_kwds["samples_per_sec"]
 
     @daq_sample_rate.setter
     def daq_sample_rate(self, hz: int):
-        self.daq_obj_kwds['samples_per_sec'] = hz
+        self.daq_obj_kwds["samples_per_sec"] = hz
 
     @property
     def n2c(self) -> dict:
         """dictionary {<analog output name> : <analog output channel>}."""
-        return self.daq_obj_kwds['ao_channels']
+        return self.daq_obj_kwds["ao_channels"]
 
     # Dynamically generated keyword arguments.
     @property
     def daq_obj_kwds(self):
         # Don't affect the config file's version by making a copy.
-        obj_kwds = copy.deepcopy(self.cfg['daq_driver_kwds'])
+        obj_kwds = copy.deepcopy(self.cfg["daq_driver_kwds"])
         # obj_kwds['period_time_s'] = sum([self.get_channel_cycle_time(ch)
         #                                  for ch in self.channels])
-        obj_kwds['period_time_s'] = self.get_channel_cycle_time(488)
+        obj_kwds["period_time_s"] = self.get_channel_cycle_time(488)
         return obj_kwds
 
     # Derived properties. These do not have setters
@@ -321,15 +328,19 @@ class ExaspimConfig(SpimConfig):
         # Proceed through ExaSPIM-specific checks:
         # Check that slit width >0 but less than the camera's number of rows.
         if self.slit_width <= 0 or self.slit_width > self.sensor_row_count:
-            msg = f"Slit width must be greater than zero but less than or " \
-                  f"equal to the number of rows ({self.sensor_row_count})."
+            msg = (
+                f"Slit width must be greater than zero but less than or "
+                f"equal to the number of rows ({self.sensor_row_count})."
+            )
             self.log.error(msg)
             error_msgs.append(msg)
         # Check that backlash reset distance > 0.
         if self.stage_backlash_reset_dist_um < 0:
-            msg = f"Stage backlash reset distance " \
-                  f"({self.stage_backlash_reset_dist_um} [um] must be greater" \
-                  f"than 0."
+            msg = (
+                f"Stage backlash reset distance "
+                f"({self.stage_backlash_reset_dist_um} [um] must be greater"
+                f"than 0."
+            )
             self.log.error(msg)
             error_msgs.append(msg)
 
@@ -341,4 +352,3 @@ class ExaspimConfig(SpimConfig):
         if error_msgs:
             all_msgs = "\n".join(error_msgs)
             raise AssertionError(all_msgs)
-

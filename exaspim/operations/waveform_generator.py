@@ -2,42 +2,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy import interpolate
+from logging import getLogger
+from pathlib import Path
 
 
-def plot_waveforms_to_pdf(t, voltages_t):
-    (
-        etl_t,
-        camera_enable_t,
-        stage_enable_t,
-        laser_488_enable_t,
-        laser_638_enable_t,
-        laser_561_enable_t,
-        laser_405_enable_t,
-        galvo_a_t,
-        galvo_b_t,
-    ) = voltages_t  # TODO fix this, use AO names to channel number to autopopulate
+def plot_waveforms_to_pdf(t, voltages_t, channels_dict):
 
-    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(10, 9))
-    axes.set_title("One Frame.")
-    axes.plot(t, etl_t, label="etl")
-    axes.plot(t, laser_488_enable_t, label="488 laser enable")
-    axes.plot(t, laser_561_enable_t, label="561 laser enable")
-    axes.plot(t, laser_638_enable_t, label="638 laser enable")
-    axes.plot(t, laser_405_enable_t, label="405 laser enable")
-    axes.plot(t, camera_enable_t, label="camera enable")
-    axes.plot(t, stage_enable_t, label="stage_enable")
-    axes.plot(t, galvo_a_t, label="galvo_a")
-    axes.plot(t, galvo_b_t, label="galvo_b")
-    axes.set_xlabel("time [s]")
-    axes.set_ylabel("amplitude [V]")
-    axes.set_ylim(0, 5)
-    axes.legend(loc="upper right")
-    fig.savefig("plot.pdf")
+    fig, axes = plt.subplots(
+        nrows=len(channels_dict), ncols=1, figsize=(10, 4 * len(channels_dict))
+    )
+    if not isinstance(axes, (list, np.ndarray)):
+        axes = [axes]
+
+    ymin, ymax = voltages_t.min() - 1, voltages_t.max() + 1
+    for (channel_name, channel_number), channel_values, axis in zip(
+        channels_dict.items(), voltages_t, axes
+    ):
+        if "etl" in channel_name or "galvo" in channel_name:
+            pass
+        else:
+            channel_name = channel_name + " enable"
+        axis.set_title(f"One Frame. {channel_name} on pin {channel_number}")
+        axis.plot(t, channel_values, label="channel_name")
+        axis.set_xlabel("time [s]")
+        axis.set_ylabel("amplitude [V]")
+        axis.set_ylim(ymin, ymax)
+        axis.legend(loc="upper right")
+    fig.savefig(Path.home() / "Documents" / "waveforms_plot.pdf")
 
 
 def generate_waveforms(cfg, plot: bool = False, channels: list[int] = None, live=False):
     voltages_t = {}
     total_samples = 0
+
+    logger = getLogger("exaspim.operations.generate_waveforms")
 
     if not isinstance(channels, list):
         raise ValueError(f"Channels must be a list ! {channels}")
@@ -155,14 +153,19 @@ def generate_waveforms(cfg, plot: bool = False, channels: list[int] = None, live
         voltages_t[ch][n2c_index["galvo_a"]] = cfg.get_galvo_a_setpoint(ch)
         voltages_t[ch][n2c_index["galvo_b"]] = cfg.get_galvo_b_setpoint(ch)
 
+    logger.info(f"Generated {len(voltages_t)} waveforms for channels {channels_list} ")
+
     # Merge voltage arrays
     voltages_out = np.array([]).reshape((len(cfg.n2c), 0))
     for ch in channels_list:
         voltages_out = np.hstack((voltages_out, voltages_t[ch]))
 
+    # cfg.n2c is a dict from the config file's [daq_driver_kwds.ao_channels] config section
+
     if plot:
+        logger.info("Plotting waveforms for visualisation.")
         # Total waveform time in sec.
         t = np.linspace(0, cfg.daq_period_time, total_samples, endpoint=False)
-        plot_waveforms_to_pdf(t, voltages_out)
+        plot_waveforms_to_pdf(t, voltages_out, cfg.n2c)
 
     return voltages_out
