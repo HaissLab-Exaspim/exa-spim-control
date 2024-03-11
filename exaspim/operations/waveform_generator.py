@@ -9,7 +9,7 @@ from pathlib import Path
 def plot_waveforms_to_pdf(t, voltages_t, channels_dict):
 
     fig, axes = plt.subplots(
-        nrows=len(channels_dict), ncols=1, figsize=(10, 4 * len(channels_dict))
+        nrows=len(channels_dict), ncols=1, figsize=(10, 6 * len(channels_dict))
     )
     if not isinstance(axes, (list, np.ndarray)):
         axes = [axes]
@@ -22,8 +22,8 @@ def plot_waveforms_to_pdf(t, voltages_t, channels_dict):
             pass
         else:
             channel_name = channel_name + " enable"
-        axis.set_title(f"One Frame. {channel_name} on pin {channel_number}")
-        axis.plot(t, channel_values, label="channel_name")
+        axis.set_title(f"One Frame. {channel_name} on pin AO{channel_number}")
+        axis.plot(t, channel_values, label=channel_name)
         axis.set_xlabel("time [s]")
         axis.set_ylabel("amplitude [V]")
         axis.set_ylim(ymin, ymax)
