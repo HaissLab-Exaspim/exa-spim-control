@@ -220,7 +220,12 @@ class ExaspimConfig(SpimConfig):
 
     @property
     def camera_digital_gain(self):
-        return self.camera_specs["digital_gain_adu"]
+        gain = self.camera_specs["digital_gain_adu"]
+        if gain < 1 or gain > 32:
+            raise ValueError(
+                "Gain value must be comprized bewteen 1 and 32. (inclusive) It was set to "
+            )
+        return gain
 
     @camera_digital_gain.setter
     def camera_digital_gain(self, adu: float):
