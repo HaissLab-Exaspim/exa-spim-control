@@ -111,18 +111,32 @@ class Exaspim(Spim):
         joystick_mapping = self.cfg.joystick_kwds[
             "axis_map"
         ].copy()  # Don't overwrite config values
+
+        machine_mapping = self.cfg.motion_control[
+            "axis_map"
+        ].copy()
+        machine_mapping = {value.lower(): key for key, value in machine_mapping.items()}
+
+        _joy_mappings = {}
         for axis in self.tigerbox.get_build_config()[
             "Motor Axes"
         ]:  # Loop through axes in tigerbox
-            if axis.lower() in joystick_mapping.keys():
+            axis = axis.lower()
+            if axis in machine_mapping.keys() and (reference_axis:= machine_mapping[axis]) in joystick_mapping.keys():
+
                 # If axis specified in config, map it to correct joystick
-                joystick_mapping[axis.lower()] = JoystickInput(
-                    joystick_mapping[axis.lower()]
+                # axis contains a machine axis, such as v, m, x, z etc. 
+                # reference_axis contains a reference axis, such as x, y or z. 
+                _joy_mappings[axis] = JoystickInput(
+                    joystick_mapping[reference_axis]
                 )
+                self.log.debug(f"Mapped machine axis {axis} to {joystick_mapping[reference_axis]} joystick input")
             else:
                 # else set axis to map to no joystick direction
-                joystick_mapping[axis.lower()] = JoystickInput(0)
-        self.tigerbox.bind_axis_to_joystick_input(**joystick_mapping)
+                _joy_mappings[axis] = JoystickInput(0)
+                self.log.debug(f"Ignored joystick mapping for machine axis {axis}")
+        self.log.debug(f"New machine to joystick mapping : {_joy_mappings}")
+        self.tigerbox.bind_axis_to_joystick_input(**_joy_mappings)
 
     def _setup_lasers(self):
         """Setup lasers that will be used for imaging. Warm them up, etc."""
@@ -147,7 +161,7 @@ class Exaspim(Spim):
                         f"Added laser keword argument 'class-style' : {k}:{kwds[k]} from module's arg_class {arg_class}"
                     )
                 else:
-                    # if self.cfg is
+                    # if self.cfg is;
                     kwds[k] = eval(v) if "." in str(v) else v
                     self.log.debug(
                         f"Added laser argument 'dictionnary-style' {k}:{kwds[k]}"
@@ -400,7 +414,7 @@ class Exaspim(Spim):
             self.sample_pose.move_absolute(self.start_pos)
             self.start_pos = None
         # Reset the starting location.
-        self.sample_pose.zero_in_place("x", "y", "z")
+        self.sample_pose.zero_in_place("x", "v", "z")
         # (ytiles-1)*y_grid_step_um
         self.stage_x_pos_um, self.stage_y_pos_um, self.stage_z_pos_um = (
             0,

@@ -29,6 +29,9 @@ class ExaspimConfig(SpimConfig):
 
         self.debug = self.cfg.get("debug", {})
 
+    def get_binning(self, channel : str):
+        return int(self.channel_specs[str(channel)]["binning"])
+
     # Per-channel getter methods.
     def get_channel_cycle_time(self, wavelength: int):
         """Returns required time to play a waveform period for a given channel."""
