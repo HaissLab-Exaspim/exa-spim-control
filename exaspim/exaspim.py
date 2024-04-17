@@ -888,6 +888,7 @@ class Exaspim(Spim):
         at begining of scan"""
         # FIXME: we should pass a starting position into collect_volumetric_image.
         self.start_pos = coords
+        self.log(f"Set new start positions to {self.start_pos}")
 
     def get_latest_image(self, channel: int = None):
         """Return the most recent acquisition image for display elsewhere.
