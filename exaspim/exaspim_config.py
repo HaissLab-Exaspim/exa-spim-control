@@ -43,7 +43,7 @@ class ExaspimConfig(SpimConfig):
         )
 
     def get_focus_position(self, wavelength: int):
-        return self.channel_specs[str(wavelength)]["focus"]["position"]
+        return self.channel_specs[str(wavelength)]["focus_position"]
 
     def get_camera_delay_time(self, wavelength: int):
         return self.channel_specs[str(wavelength)]["camera"]["delay_time_s"]
