@@ -66,7 +66,7 @@ class NI:
         self.ao_task = nidaqmx.Task("analog_output_task")
         for channel_name, channel_index in self.ao_names_to_channels.items():
             physical_name = f"/{self.dev_name}/ao{channel_index}"
-            self.ao_task.ao_channels.add_ao_voltage_chan(physical_name)
+            self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=0, max_val=10.0)
         self.ao_task.timing.cfg_samp_clk_timing(
             rate=self.samples_per_sec,
             active_edge=Edge.RISING,
