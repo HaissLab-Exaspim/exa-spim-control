@@ -1,6 +1,7 @@
 import copy
 from pathlib import Path
 from spim_core.config_base import SpimConfig
+from typing import List, Dict
 
 # A template from which we can define a blank exaspim config.
 # TODO: create this.
@@ -22,8 +23,9 @@ class ExaspimConfig(SpimConfig):
         self.camera_specs = self.cfg["camera_specs"]
 
         # Keyword arguments for instantiating objects.
-        self.joystick_kwds = self.cfg["joystick_kwds"]
-        self.sample_pose_kwds = self.cfg["sample_pose_kwds"]
+        self.joystick = self.cfg["joystick"]
+        self.sample_pose = self.cfg["sample_pose"]
+        self.camera_pose = self.cfg["camera_pose"]
         self.motion_control = self.cfg["motion_control"]
         # Other obj kwds are generated dynamically.
 
@@ -41,6 +43,19 @@ class ExaspimConfig(SpimConfig):
             + self.frame_rest_time
             + self.camera_dwell_time
         )
+    
+    def get_joystick_mapping(self, uppercase = False):
+        return {k.upper() : v for k, v in self.joystick["axis_map"]} if uppercase else {k.lower() : v for k, v in self.joystick["axis_map"]}
+
+    def get_axes_maps(self, uppercase = False) -> Dict[str,str]:
+        all_axes_maps = {}
+        all_axes_maps.update(self.sample_pose["axis_map"])
+        all_axes_maps.update(self.camera_pose["axis_map"])
+        return {k.upper() : v for k, v in all_axes_maps.items()} if uppercase else {k.lower():v for k,v in all_axes_maps.items()}
+    
+    def get_motor_axes(self, uppercase = False) -> List[str]:
+        axes = list(self.sample_pose["axis_map"].values()) + list(self.camera_pose["axis_map"].values()) 
+        return [x.upper() for x in axes] if uppercase else [x.lower() for x in axes]
 
     def get_focus_position(self, wavelength: int):
         return self.channel_specs[str(wavelength)]["focus_position"]

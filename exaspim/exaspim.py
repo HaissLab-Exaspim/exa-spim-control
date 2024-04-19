@@ -27,7 +27,7 @@ from math import ceil, floor
 from tigerasi.tiger_controller import TigerController, STEPS_PER_UM
 from tigerasi.sim_tiger_controller import SimTigerController as SimTiger
 from spim_core.spim_base import Spim, lock_external_user_input
-from spim_core.devices.tiger_components import SamplePose
+from spim_core.devices.tiger_components import SamplePose, CameraPose
 from tigerasi.device_codes import JoystickInput
 from egrabber import query
 import sys
@@ -58,14 +58,15 @@ class Exaspim(Spim):
             self.log.info("Creating motor controller in simulated mode")
             self.tigerbox = SimTiger(
                 **self.cfg.motion_control["driver_kwds"],
-                build_config={"Motor Axes": ["X", "Y", "Z", "N"]},
+                build_config={"Motor Axes": self.cfg.get_motor_axes(uppercase=True)},
             )
             # ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']
         else:
             self.log.info("Creating motor controller in standard mode")
             self.tigerbox = TigerController(**self.cfg.motion_control["driver_kwds"])
 
-        self.sample_pose = SamplePose(self.tigerbox, **self.cfg.sample_pose_kwds)
+        self.sample_pose = SamplePose(self.tigerbox, self.cfg.sample_pose["axis_map"])
+        self.camera_pose = CameraPose(self.tigerbox, self.cfg.camera_pose["axis_map"])
         # Extra Internal State attributes for the current image capture
         # sequence. These really only need to persist for logging purposes.
         self.frame_index = 0  # current image to capture.
@@ -108,35 +109,31 @@ class Exaspim(Spim):
     def _setup_joystick(self):
         """Configure joystick based on value in config"""
 
-        joystick_mapping = self.cfg.joystick_kwds[
-            "axis_map"
-        ].copy()  # Don't overwrite config values
+        joystick_mapping = self.cfg.get_joystick_mapping(uppercase=False)
 
-        machine_mapping = self.cfg.motion_control[
-            "axis_map"
-        ].copy()
-        machine_mapping = {value.lower(): key for key, value in machine_mapping.items()}
+        reference_to_machine = self.cfg.get_axes_maps(uppercase=False)
+        machine_to_reference = {v:k for k,v in reference_to_machine.items()}
 
-        _joy_mappings = {}
+        joystick_axes = {}
         for axis in self.tigerbox.get_build_config()[
             "Motor Axes"
         ]:  # Loop through axes in tigerbox
             axis = axis.lower()
-            if axis in machine_mapping.keys() and (reference_axis:= machine_mapping[axis]) in joystick_mapping.keys():
+            if axis in self.machine_to_reference.keys() and (machine_to_reference[axis]) in joystick_mapping.keys():
 
                 # If axis specified in config, map it to correct joystick
                 # axis contains a machine axis, such as v, m, x, z etc. 
                 # reference_axis contains a reference axis, such as x, y or z. 
-                _joy_mappings[axis] = JoystickInput(
-                    joystick_mapping[reference_axis]
+                joystick_axes[axis] = JoystickInput(
+                    joystick_mapping[machine_to_reference[axis]]
                 )
-                self.log.debug(f"Mapped machine axis {axis} to {joystick_mapping[reference_axis]} joystick input")
+                self.log.debug(f"Mapped machine axis {axis} to {joystick_mapping[machine_to_reference[axis]]} joystick input")
             else:
                 # else set axis to map to no joystick direction
-                _joy_mappings[axis] = JoystickInput(0)
+                joystick_axes[axis] = JoystickInput(0)
                 self.log.debug(f"Ignored joystick mapping for machine axis {axis}")
-        self.log.debug(f"New machine to joystick mapping : {_joy_mappings}")
-        self.tigerbox.bind_axis_to_joystick_input(**_joy_mappings)
+        self.log.debug(f"New machine to joystick mapping : {joystick_axes}")
+        self.tigerbox.bind_axis_to_joystick_input(**joystick_axes)
 
     def _setup_lasers(self):
         """Setup lasers that will be used for imaging. Warm them up, etc."""
@@ -438,14 +435,16 @@ class Exaspim(Spim):
                     for ch in channels:
 
                         self._setup_waveform_hardware([ch])
-                        # MOVE N AXIS OF TIGER BOX TO REFOCUS PER COLOR
-                        print(self.cfg.get_focus_position(ch))
-                        assert self.cfg.get_focus_position(ch) < -500
-                        print(self.cfg.get_focus_position(ch))
-                        assert self.cfg.get_focus_position(ch) > -1500
-                        print(self.cfg.get_focus_position(ch) * STEPS_PER_UM)
+
+                        # MOVE M AXIS OF TIGER BOX TO REFOCUS PER COLOR
+                        focus_micrometer_position = self.cfg.get_focus_position(ch)
+                    
+                        if focus_micrometer_position < -1500 or focus_micrometer_position > -500 :
+                            raise ValueError(f"Focus position must be between {-1500} and {-500} (exclusive). Value for channel {ch} was {focus_micrometer_position}")
+                        self.log.debug(f"Moving camera to focus position {focus_micrometer_position} for the channel {ch}")
+                        
                         self.tigerbox.move_absolute(
-                            n=round(self.cfg.get_focus_position(ch) * STEPS_PER_UM)
+                            m=round(focus_micrometer_position * STEPS_PER_UM)
                         )
 
                         self.sample_pose.move_absolute(
