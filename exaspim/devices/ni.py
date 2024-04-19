@@ -66,7 +66,15 @@ class NI:
         self.ao_task = nidaqmx.Task("analog_output_task")
         for channel_name, channel_index in self.ao_names_to_channels.items():
             physical_name = f"/{self.dev_name}/ao{channel_index}"
-            self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=0, max_val=10.0)
+            self.log.debug(f'Setting channel {physical_name} to NI task')
+            if str(channel_name) == '/Dev1/ao17' or str(channel_name) == '/Dev1/ao19': 
+                # this is not zorking, need to set the boolean test to  f"/{self.dev_name}/ao{channel_index}"
+                # this is in case it is glavo a or b, hard coced, need to make this config dependant
+                min_val = -1
+            else : 
+                min_val = -0.001
+            self.log.debug(f'Channel {physical_name} min value is {min_val}')
+            self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=min_val, max_val=10.0)
         self.ao_task.timing.cfg_samp_clk_timing(
             rate=self.samples_per_sec,
             active_edge=Edge.RISING,
