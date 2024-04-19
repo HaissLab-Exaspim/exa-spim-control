@@ -111,15 +111,14 @@ class Exaspim(Spim):
 
         joystick_mapping = self.cfg.get_joystick_mapping(uppercase=False)
 
-        reference_to_machine = self.cfg.get_axes_maps(uppercase=False)
-        machine_to_reference = {v:k for k,v in reference_to_machine.items()}
+        machine_to_reference = {v:k for k,v in self.cfg.get_all_mappings(uppercase=False).items()}
 
         joystick_axes = {}
         for axis in self.tigerbox.get_build_config()[
             "Motor Axes"
         ]:  # Loop through axes in tigerbox
             axis = axis.lower()
-            if axis in self.machine_to_reference.keys() and (machine_to_reference[axis]) in joystick_mapping.keys():
+            if axis in machine_to_reference.keys() and (machine_to_reference[axis]) in joystick_mapping.keys():
 
                 # If axis specified in config, map it to correct joystick
                 # axis contains a machine axis, such as v, m, x, z etc. 
@@ -411,7 +410,7 @@ class Exaspim(Spim):
             self.sample_pose.move_absolute(self.start_pos)
             self.start_pos = None
         # Reset the starting location.
-        self.sample_pose.zero_in_place("x", "v", "z")
+        self.sample_pose.zero_in_place() # zero in place all machine axes of sample pose, if called without arguments
         # (ytiles-1)*y_grid_step_um
         self.stage_x_pos_um, self.stage_y_pos_um, self.stage_z_pos_um = (
             0,
@@ -443,8 +442,9 @@ class Exaspim(Spim):
                             raise ValueError(f"Focus position must be between {-1500} and {-500} (exclusive). Value for channel {ch} was {focus_micrometer_position}")
                         self.log.debug(f"Moving camera to focus position {focus_micrometer_position} for the channel {ch}")
                         
-                        self.tigerbox.move_absolute(
-                            m=round(focus_micrometer_position * STEPS_PER_UM)
+                        # should we wait here or do we assume the small M movement will be finished when the following sample_pose move absolute is finished ?
+                        self.camera_pose.move_absolute(
+                            c=round(focus_micrometer_position * STEPS_PER_UM), wait = False
                         )
 
                         self.sample_pose.move_absolute(
@@ -678,6 +678,12 @@ class Exaspim(Spim):
         last_frame_index = frame_count - 1
         remainder = frame_count % chunk_size
         last_chunk_size = chunk_size if not remainder else remainder
+
+        self.log.debug(f"chunk_count is {chunk_count}")
+        self.log.debug(f"chunk_size is {chunk_size}")
+        self.log.debug(f"remainder size is {remainder}")
+        self.log.debug(f"last_chunk_size size is {last_chunk_size}")
+        
         start_time = perf_counter()
         self.cam.start(
             len(channels) * frame_count, live=False
@@ -686,6 +692,7 @@ class Exaspim(Spim):
             # Images arrive serialized in repeating channel order.
             for stack_index in tqdm(range(frame_count), desc="ZStack progress"):
                 chunk_index = stack_index % chunk_size
+                self.log.debug(f"chunk_index is {chunk_index}")
                 # Start a batch of pulses to generate more frames and movements.
                 if chunk_index == 0:
                     chunks_filled = floor(stack_index / chunk_size)
@@ -697,8 +704,10 @@ class Exaspim(Spim):
                     self.log.debug(
                         f"Current memory usage: {self.get_mem_consumption():.3f}%"
                     )
+                    self.log.debug(f"setting ni card pulses count to {chunk_index}")
                     self.ni.set_pulse_count(num_pulses)
                     self.ni.start()
+                    
                 # Deserialize camera input into corresponding channel.
                 for ch_index in channels:
                     self.log.debug(

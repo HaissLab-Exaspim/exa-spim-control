@@ -91,7 +91,7 @@ class Camera:
         # Note: creating the buffer and then "pushing" it at the end has the
         # 	effect of moving the internal camera frame buffer from the output
         # 	pool back to the input pool, so it can be reused.
-        timeout_ms = int(1000e3)
+        timeout_ms = int(1000e3) # 1000e3 timeout is 16 minutes !
         with Buffer(self.grabber, timeout=timeout_ms) as buffer:
             ptr = buffer.get_info(
                 BUFFER_INFO_BASE, INFO_DATATYPE_PTR

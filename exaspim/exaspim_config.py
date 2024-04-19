@@ -26,6 +26,7 @@ class ExaspimConfig(SpimConfig):
         self.joystick = self.cfg["joystick"]
         self.sample_pose = self.cfg["sample_pose"]
         self.camera_pose = self.cfg["camera_pose"]
+        self.rotary_pose = self.cfg["rotary_pose"]
         self.motion_control = self.cfg["motion_control"]
         # Other obj kwds are generated dynamically.
 
@@ -44,10 +45,19 @@ class ExaspimConfig(SpimConfig):
             + self.camera_dwell_time
         )
     
-    def get_joystick_mapping(self, uppercase = False):
-        return {k.upper() : v for k, v in self.joystick["axis_map"]} if uppercase else {k.lower() : v for k, v in self.joystick["axis_map"]}
+    def get_camera_pose_mapping(self, uppercase = False):
+        return {k.upper() : v for k, v in self.camera_pose["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.camera_pose["axis_map"].items()}
 
-    def get_axes_maps(self, uppercase = False) -> Dict[str,str]:
+    def get_sample_pose_mapping(self, uppercase = False):
+        return {k.upper() : v for k, v in self.sample_pose["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.sample_pose["axis_map"].items()}
+    
+    def get_rotary_pose_mapping(self, uppercase = False):
+        return {k.upper() : v for k, v in self.rotary_pose["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.rotary_pose["axis_map"].items()}
+
+    def get_joystick_mapping(self, uppercase = False):
+        return {k.upper() : v for k, v in self.joystick["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.joystick["axis_map"].items()}
+
+    def get_all_mappings(self, uppercase = False) -> Dict[str,str]:
         all_axes_maps = {}
         all_axes_maps.update(self.sample_pose["axis_map"])
         all_axes_maps.update(self.camera_pose["axis_map"])
