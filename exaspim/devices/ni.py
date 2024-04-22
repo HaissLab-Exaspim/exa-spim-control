@@ -2,6 +2,7 @@ import logging
 import nidaqmx
 from nidaqmx.constants import Level, Edge, Slope, TaskMode, TerminalConfiguration, AOIdleOutputBehavior, AcquisitionType as AcqType, FrequencyUnits as Freq
 from time import sleep
+from typing import Union
 
 class NI:
 
@@ -72,8 +73,8 @@ class NI:
                 max_val = 5.1
             self.log.debug(f'Channel {physical_name} voltage boundary values are {min_val} to {max_val}')
             channel = self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=min_val, max_val=max_val)
-            channel.ao_term_cfg = TerminalConfiguration.DEFAULT # do not change the default AO chanel electrical termination configuration.
-            channel.ao_idle_output_behavior = AOIdleOutputBehavior.MAINTAIN_EXISTING_VALUE
+            # channel.ao_term_cfg = TerminalConfiguration.DEFAULT # do not change the default AO chanel electrical termination configuration.
+            # channel.ao_idle_output_behavior = AOIdleOutputBehavior.HIGH_IMPEDANCE
 
         self.ao_task.timing.cfg_samp_clk_timing(
             rate=self.samples_per_sec,
@@ -90,8 +91,8 @@ class NI:
         self.ao_task.out_stream.output_buf_size = self.daq_samples  # Sets buffer to length of voltages
         self.ao_task.control(TaskMode.TASK_COMMIT)
 
-    def get_channel_physical_name(self, channel_nb : int | str, type = "ao") -> str :
-        physical_name = f"/{self.dev_name}/ao{channel_nb}"
+    def get_channel_physical_name(self, channel_nb : Union[int, str], type = "ao") -> str :
+        physical_name = f"/{self.dev_name}/{type}{channel_nb}"
         return physical_name
     
     def assign_waveforms(self, voltages_t, scout_mode: bool = False):

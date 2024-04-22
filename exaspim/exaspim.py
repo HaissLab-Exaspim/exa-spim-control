@@ -60,13 +60,14 @@ class Exaspim(Spim):
                 **self.cfg.motion_control["driver_kwds"],
                 build_config={"Motor Axes": self.cfg.get_motor_axes(uppercase=True)},
             )
-            # ['X', 'Y', 'Z', 'M', 'N', 'W', 'V']
         else:
             self.log.info("Creating motor controller in standard mode")
             self.tigerbox = TigerController(**self.cfg.motion_control["driver_kwds"])
 
-        self.sample_pose = SamplePose(self.tigerbox, self.cfg.sample_pose["axis_map"])
-        self.camera_pose = CameraPose(self.tigerbox, self.cfg.camera_pose["axis_map"])
+        self.sample_pose = SamplePose(self.tigerbox, self.cfg.get_sample_pose_mapping(uppercase=False))
+        self.rotary_pose = SamplePose(self.tigerbox, self.cfg.get_rotary_pose_mapping(uppercase=False))
+        self.camera_pose = CameraPose(self.tigerbox, self.cfg.get_camera_pose_mapping(uppercase=False))
+        
         # Extra Internal State attributes for the current image capture
         # sequence. These really only need to persist for logging purposes.
         self.frame_index = 0  # current image to capture.
@@ -111,7 +112,7 @@ class Exaspim(Spim):
 
         joystick_mapping = self.cfg.get_joystick_mapping(uppercase=False)
 
-        machine_to_reference = {v:k for k,v in self.cfg.get_all_mappings(uppercase=False).items()}
+        machine_to_reference = {v:k for k,v in self.cfg.get_all_poses_mappings(uppercase=False).items()}
 
         joystick_axes = {}
         for axis in self.tigerbox.get_build_config()[

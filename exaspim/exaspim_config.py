@@ -24,9 +24,10 @@ class ExaspimConfig(SpimConfig):
 
         # Keyword arguments for instantiating objects.
         self.joystick = self.cfg["joystick"]
-        self.sample_pose = self.cfg["sample_pose"]
-        self.camera_pose = self.cfg["camera_pose"]
-        self.rotary_pose = self.cfg["rotary_pose"]
+        self.axis_maps = self.cfg["axis_maps"]
+        # self.sample_pose = self.cfg["sample_pose"]
+        # self.camera_pose = self.cfg["camera_pose"]
+        # self.rotary_pose = self.cfg["rotary_pose"]
         self.motion_control = self.cfg["motion_control"]
         # Other obj kwds are generated dynamically.
 
@@ -46,26 +47,28 @@ class ExaspimConfig(SpimConfig):
         )
     
     def get_camera_pose_mapping(self, uppercase = False):
-        return {k.upper() : v for k, v in self.camera_pose["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.camera_pose["axis_map"].items()}
+        case = str.upper if uppercase else str.lower
+        return {case(k) : v for k, v in self.axis_maps["poses"]["camera"].items()}
 
     def get_sample_pose_mapping(self, uppercase = False):
-        return {k.upper() : v for k, v in self.sample_pose["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.sample_pose["axis_map"].items()}
+        case = str.upper if uppercase else str.lower
+        return {case(k) : v for k, v in self.axis_maps["poses"]["sample"].items()}
     
     def get_rotary_pose_mapping(self, uppercase = False):
-        return {k.upper() : v for k, v in self.rotary_pose["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.rotary_pose["axis_map"].items()}
+        case = str.upper if uppercase else str.lower
+        return {case(k) : v for k, v in self.axis_maps["poses"]["rotary"].items()}
 
     def get_joystick_mapping(self, uppercase = False):
-        return {k.upper() : v for k, v in self.joystick["axis_map"].items()} if uppercase else {k.lower() : v for k, v in self.joystick["axis_map"].items()}
+        case = str.upper if uppercase else str.lower
+        return {case(k) : v for k, v in self.axis_maps["joystick"].items()}
 
-    def get_all_mappings(self, uppercase = False) -> Dict[str,str]:
-        all_axes_maps = {}
-        all_axes_maps.update(self.sample_pose["axis_map"])
-        all_axes_maps.update(self.camera_pose["axis_map"])
-        return {k.upper() : v for k, v in all_axes_maps.items()} if uppercase else {k.lower():v for k,v in all_axes_maps.items()}
+    def get_all_poses_mappings(self, uppercase = False) -> Dict[str,str]:
+        case = str.upper if uppercase else str.lower
+        all_axes_maps = {case(k) : v for _, mapping in self.axis_maps["poses"].items() for k, v in mapping.items() }
+        return all_axes_maps
     
     def get_motor_axes(self, uppercase = False) -> List[str]:
-        axes = list(self.sample_pose["axis_map"].values()) + list(self.camera_pose["axis_map"].values()) 
-        return [x.upper() for x in axes] if uppercase else [x.lower() for x in axes]
+        return list(self.get_all_poses_mappings(uppercase).values())
 
     def get_focus_position(self, wavelength: int):
         return self.channel_specs[str(wavelength)]["focus_position"]
