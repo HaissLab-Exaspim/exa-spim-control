@@ -1,11 +1,6 @@
 import logging
 import nidaqmx
-from nidaqmx.constants import FrequencyUnits as Freq
-from nidaqmx.constants import Level
-from nidaqmx.constants import AcquisitionType as AcqType
-from nidaqmx.constants import Edge
-from nidaqmx.constants import Slope
-from nidaqmx.constants import TaskMode
+from nidaqmx.constants import Level, Edge, Slope, TaskMode, TerminalConfiguration, AOIdleOutputBehavior, AcquisitionType as AcqType, FrequencyUnits as Freq
 from time import sleep
 
 class NI:
@@ -52,29 +47,34 @@ class NI:
 
         self.co_task = nidaqmx.Task('counter_output_task')
         co_chan = self.co_task.co_channels.add_co_pulse_chan_freq(
-            f'/{self.dev_name}/ctr0',
+            self.get_channel_physical_name(channel_nb="0",type="ctr"), # counter 0
             units=Freq.HZ,
             idle_state=Level.LOW,
             initial_delay=0.0,
             freq=frequency,
             duty_cycle=0.5)
-        co_chan.co_pulse_term = f'/{self.dev_name}/PFI0'
+        co_chan.co_pulse_term = self.get_channel_physical_name(channel_nb="0",type="PFI")
 
         if live:
             self.set_pulse_count(pulse_count=0)
 
         self.ao_task = nidaqmx.Task("analog_output_task")
         for channel_name, channel_index in self.ao_names_to_channels.items():
-            physical_name = f"/{self.dev_name}/ao{channel_index}"
+            physical_name = self.get_channel_physical_name(channel_index, type = "ao")
             self.log.debug(f'Setting channel {physical_name} to NI task')
-            if str(channel_name) == '/Dev1/ao17' or str(channel_name) == '/Dev1/ao19': 
-                # this is not zorking, need to set the boolean test to  f"/{self.dev_name}/ao{channel_index}"
-                # this is in case it is glavo a or b, hard coced, need to make this config dependant
+            if "galvo" in channel_name.lower(): 
+                # safeguard for negative/positive values to AO channels, used for galvos primarily
+                # TODO :hard coded, need to make this config dependant
                 min_val = -1
-            else : 
-                min_val = -0.001
-            self.log.debug(f'Channel {physical_name} min value is {min_val}')
-            self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=min_val, max_val=10.0)
+                max_val = 10
+            else :
+                min_val = -0.1 # safeguard for 0 to 5V values to AO channels
+                max_val = 5.1
+            self.log.debug(f'Channel {physical_name} voltage boundary values are {min_val} to {max_val}')
+            channel = self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=min_val, max_val=max_val)
+            channel.ao_term_cfg = TerminalConfiguration.DEFAULT # do not change the default AO chanel electrical termination configuration.
+            channel.ao_idle_output_behavior = AOIdleOutputBehavior.MAINTAIN_EXISTING_VALUE
+
         self.ao_task.timing.cfg_samp_clk_timing(
             rate=self.samples_per_sec,
             active_edge=Edge.RISING,
@@ -84,12 +84,16 @@ class NI:
         # TODO: trigger source should be in the config.
         self.ao_task.triggers.start_trigger.cfg_dig_edge_start_trig(
 #			trigger_source=f'/{self.dev_name}/PFI1',
-            trigger_source=f'/{self.dev_name}/PFI0',
+            trigger_source= self.get_channel_physical_name(channel_nb="0",type="PFI"),
             trigger_edge=Slope.RISING)
 
         self.ao_task.out_stream.output_buf_size = self.daq_samples  # Sets buffer to length of voltages
         self.ao_task.control(TaskMode.TASK_COMMIT)
 
+    def get_channel_physical_name(self, channel_nb : int | str, type = "ao") -> str :
+        physical_name = f"/{self.dev_name}/ao{channel_nb}"
+        return physical_name
+    
     def assign_waveforms(self, voltages_t, scout_mode: bool = False):
 
         if scout_mode:
