@@ -23,7 +23,7 @@ class ExaspimConfig(SpimConfig):
         self.camera_specs = self.cfg["camera_specs"]
 
         # Keyword arguments for instantiating objects.
-        self.joystick = self.cfg["joystick"]
+        # self.joystick = self.cfg["joystick"]
         self.axis_maps = self.cfg["axis_maps"]
         # self.sample_pose = self.cfg["sample_pose"]
         # self.camera_pose = self.cfg["camera_pose"]
@@ -32,9 +32,27 @@ class ExaspimConfig(SpimConfig):
         # Other obj kwds are generated dynamically.
 
         self.debug = self.cfg.get("debug", {})
+        self.forbidden_ctl_axes = self.axis_maps.get("forbidden_control", [])
 
-    def get_binning(self, channel : str):
+    @property
+    def frame_timeout(self) -> int:
+        return int(self.camera_specs.get("pulse_timeout_ms", 1000e3))
+        # 1000e3 : default timeout to 16 minutes !
+
+    @property
+    def plot_waveforms(self) -> bool:
+        return self.debug.get("plot_waveforms", False)
+
+    @property
+    def save_waveforms(self) -> bool:
+        return self.debug.get("save_waveforms", False)
+
+    def get_binning(self, channel : str) -> int:
         return int(self.channel_specs[str(channel)]["binning"])
+
+    def get_forbidden_ctl_axes(self, uppercase = False) -> List[str]:
+        case = str.upper if uppercase else str.lower
+        return [case(k) for k in self.forbidden_ctl_axes]
 
     # Per-channel getter methods.
     def get_channel_cycle_time(self, wavelength: int):

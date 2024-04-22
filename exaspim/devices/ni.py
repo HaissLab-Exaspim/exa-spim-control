@@ -1,6 +1,15 @@
 import logging
 import nidaqmx
-from nidaqmx.constants import Level, Edge, Slope, TaskMode, TerminalConfiguration, AOIdleOutputBehavior, AcquisitionType as AcqType, FrequencyUnits as Freq
+from nidaqmx.constants import (Level, 
+                               Edge, 
+                               Slope, 
+                               TaskMode, 
+                               TerminalConfiguration, 
+                               AOIdleOutputBehavior, 
+                               AcquisitionType as AcqType, 
+                               FrequencyUnits as Freq,
+                               SourceSelection
+                               )
 from time import sleep
 from typing import Union
 
@@ -62,7 +71,7 @@ class NI:
         self.ao_task = nidaqmx.Task("analog_output_task")
         for channel_name, channel_index in self.ao_names_to_channels.items():
             physical_name = self.get_channel_physical_name(channel_index, type = "ao")
-            self.log.debug(f'Setting channel {physical_name} to NI task')
+            self.log.debug(f'Adding channel {physical_name}-{channel_name} to NI task')
             if "galvo" in channel_name.lower(): 
                 # safeguard for negative/positive values to AO channels, used for galvos primarily
                 # TODO :hard coded, need to make this config dependant
@@ -73,8 +82,14 @@ class NI:
                 max_val = 5.1
             self.log.debug(f'Channel {physical_name} voltage boundary values are {min_val} to {max_val}')
             channel = self.ao_task.ao_channels.add_ao_voltage_chan(physical_name, min_val=min_val, max_val=max_val)
-            # channel.ao_term_cfg = TerminalConfiguration.DEFAULT # do not change the default AO chanel electrical termination configuration.
-            # channel.ao_idle_output_behavior = AOIdleOutputBehavior.HIGH_IMPEDANCE
+            channel.ao_term_cfg = TerminalConfiguration.RSE # change the default AO chanel electrical termination configuration
+            channel.ao_dac_ref_src = SourceSelection.INTERNAL
+            # channel.ao_dac_ref_allow_conn_to_gnd = True
+            try : 
+                channel.ao_idle_output_behavior = AOIdleOutputBehavior.HIGH_IMPEDANCE
+            except Exception as e:
+                self.log.error(f"Could not set AOIdleOutputBehavior to HIGH_IMPEDANCE on channel {physical_name} for {channel_name}."
+                               f"\nError : {e}")
 
         self.ao_task.timing.cfg_samp_clk_timing(
             rate=self.samples_per_sec,
@@ -102,7 +117,14 @@ class NI:
             self.ao_task.out_stream.output_buf_size = len(voltages_t[0])  # Sets buffer to length of voltages
             self.ao_task.control(TaskMode.TASK_COMMIT)
 
-        self.ao_task.write(voltages_t)
+        for (channel_name, channel_id), data in zip(self.ao_names_to_channels.items(), voltages_t) :
+            self.log.debug(f"Writing channel ao{channel_id}-{channel_name} with {len(data)} samples, max being {max(data)} and min being {min(data)}")
+
+        new_v = []
+        for volt in voltages_t :
+            new_v.append([float(item) for item in volt])
+
+        self.ao_task.write(new_v, auto_start=False)
 
     def set_pulse_count(self, pulse_count: int = None):
         """Set the number of pulses to generate or None if pulsing continuously.

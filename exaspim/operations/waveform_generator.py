@@ -4,7 +4,10 @@ from scipy import signal
 from scipy import interpolate
 from logging import getLogger
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING :
+    from exaspim.exaspim_config import ExaspimConfig
 
 def plot_waveforms_to_pdf(t, voltages_t, channels_dict):
 
@@ -31,7 +34,14 @@ def plot_waveforms_to_pdf(t, voltages_t, channels_dict):
     fig.savefig(Path.home() / "Documents" / "waveforms_plot.pdf")
 
 
-def generate_waveforms(cfg, plot: bool = False, channels: list[int] = None, live=False):
+def generate_waveforms(cfg : "ExaspimConfig", 
+                       channels: list[int] = None, 
+                       plot: bool = False, 
+                       save= False, 
+                       live=False):
+    """
+    Create lookup table to go from ao channel name to voltages_t index.
+    """
     voltages_t = {}
     total_samples = 0
 
@@ -40,8 +50,7 @@ def generate_waveforms(cfg, plot: bool = False, channels: list[int] = None, live
     if not isinstance(channels, list):
         raise ValueError(f"Channels must be a list ! {channels}")
 
-    # Create lookup table to go from ao channel name to voltages_t index.
-    #   This must match the order the NI card will create them.
+    # This must match the order the NI card will create them.
     # name to channel index (i.e: hardware pin number) lookup table:
     n2c_index = {name: index for index, (name, _) in enumerate(cfg.n2c.items())}
 
@@ -51,6 +60,7 @@ def generate_waveforms(cfg, plot: bool = False, channels: list[int] = None, live
     dwell_time_samples = int(cfg.daq_sample_rate * cfg.camera_dwell_time)
     pulse_samples = int(cfg.daq_sample_rate * cfg.ttl_pulse_time)
     channels_list = cfg.channels if channels is None else channels
+    channels_list = channels_list if isinstance(channels_list,list) else [channels_list]
     for ch in channels_list:
         # Create channel-specific samples arrays for various relevant timings
         camera_delay_samples = int(cfg.daq_sample_rate * cfg.get_camera_delay_time(ch))
@@ -167,5 +177,10 @@ def generate_waveforms(cfg, plot: bool = False, channels: list[int] = None, live
         # Total waveform time in sec.
         t = np.linspace(0, cfg.daq_period_time, total_samples, endpoint=False)
         plot_waveforms_to_pdf(t, voltages_out, cfg.n2c)
+
+    if save:
+        logger.info("Saving waveforms to numpy for debugging")
+        np.save(Path.home() / "Documents" / "waveforms.values", voltages_out)
+        np.save(Path.home() / "Documents" / "waveforms.time", t)
 
     return voltages_out

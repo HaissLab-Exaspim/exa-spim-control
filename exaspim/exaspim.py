@@ -30,6 +30,7 @@ from spim_core.spim_base import Spim, lock_external_user_input
 from spim_core.devices.tiger_components import SamplePose, CameraPose
 from tigerasi.device_codes import JoystickInput
 from egrabber import query
+from egrabber.generated.errors import TimeoutException
 import sys
 
 # Constants
@@ -216,7 +217,8 @@ class Exaspim(Spim):
         self.log.info("Generating waveforms.")
         voltages_t = generate_waveforms(
             self.cfg,
-            plot=bool(self.cfg.debug.get("plot_waveforms", False)),
+            plot=self.cfg.plot_waveforms,
+            save=self.cfg.save_waveforms,
             channels=self.active_lasers,
             live=live,
         )
@@ -680,6 +682,8 @@ class Exaspim(Spim):
         remainder = frame_count % chunk_size
         last_chunk_size = chunk_size if not remainder else remainder
 
+        frame_timeout = self.cfg.frame_timeout
+
         self.log.debug(f"chunk_count is {chunk_count}")
         self.log.debug(f"chunk_size is {chunk_size}")
         self.log.debug(f"remainder size is {remainder}")
@@ -689,11 +693,12 @@ class Exaspim(Spim):
         self.cam.start(
             len(channels) * frame_count, live=False
         )  # TODO: rewrite to block until ready.
+
         try:
             # Images arrive serialized in repeating channel order.
             for stack_index in tqdm(range(frame_count), desc="ZStack progress"):
                 chunk_index = stack_index % chunk_size
-                self.log.debug(f"chunk_index is {chunk_index}")
+                self.log.debug(f"Chunk_index is {chunk_index}")
                 # Start a batch of pulses to generate more frames and movements.
                 if chunk_index == 0:
                     chunks_filled = floor(stack_index / chunk_size)
@@ -705,7 +710,7 @@ class Exaspim(Spim):
                     self.log.debug(
                         f"Current memory usage: {self.get_mem_consumption():.3f}%"
                     )
-                    self.log.debug(f"setting ni card pulses count to {chunk_index}")
+                    self.log.debug(f"Setting ni card pulses count to {num_pulses}")
                     self.ni.set_pulse_count(num_pulses)
                     self.ni.start()
                     
@@ -716,9 +721,13 @@ class Exaspim(Spim):
                         f"{stack_index + 1:9}/{frame_count} for "
                         f"{ch_index}[nm] channel."
                     )
-                    self.img_buffers[ch_index].write_buf[
-                        chunk_index
-                    ] = self.cam.grab_frame()
+                    try :
+                        self.img_buffers[ch_index].write_buf[
+                            chunk_index
+                        ] = self.cam.grab_frame(timeout_ms = frame_timeout)
+                    except TimeoutException : #Egrabber TimeoutException zhen aa frame gets waited for too long
+                        raise TimeoutError("Could not grab a frame during the expected time. "
+                                           "Maybe we missed some pulses ? Try lowering the idle time with 'frame_rest_time_s'")
 
                     # Also write a copy of the latest image to a location where
                     # the MIP processor can process it.
