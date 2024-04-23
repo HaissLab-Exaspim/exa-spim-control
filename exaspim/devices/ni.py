@@ -88,8 +88,9 @@ class NI:
             try : 
                 channel.ao_idle_output_behavior = AOIdleOutputBehavior.HIGH_IMPEDANCE
             except Exception as e:
-                self.log.error(f"Could not set AOIdleOutputBehavior to HIGH_IMPEDANCE on channel {physical_name} for {channel_name}."
-                               f"\nError : {e}")
+                self.log.info("Could not set AOIdleOutputBehavior to HIGH_IMPEDANCE "
+                              f"on channel {physical_name} for {channel_name}.")
+                              # f"\nError : {e}")
 
         self.ao_task.timing.cfg_samp_clk_timing(
             rate=self.samples_per_sec,
