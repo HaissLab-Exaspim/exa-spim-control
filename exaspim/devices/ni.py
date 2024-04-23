@@ -112,19 +112,25 @@ class NI:
     
     def assign_waveforms(self, voltages_t, scout_mode: bool = False):
 
-        if scout_mode:
-            self.ao_task.control(TaskMode.TASK_UNRESERVE)   # Unreserve buffer
-            self.ao_task.out_stream.output_buf_size = len(voltages_t[0])  # Sets buffer to length of voltages
-            self.ao_task.control(TaskMode.TASK_COMMIT)
-
-        for (channel_name, channel_id), data in zip(self.ao_names_to_channels.items(), voltages_t) :
-            self.log.debug(f"Writing channel ao{channel_id}-{channel_name} with {len(data)} samples, max being {max(data)} and min being {min(data)}")
+        #if scout_mode:
+        self.ao_task.control(TaskMode.TASK_UNRESERVE)   # Unreserve buffer
+        self.ao_task.timing.cfg_samp_clk_timing(
+            rate=self.samples_per_sec,
+            active_edge=Edge.RISING,
+            sample_mode=AcqType.FINITE,
+            samps_per_chan=len(voltages_t[0]))
+        self.ao_task.out_stream.output_buf_size = len(voltages_t[0])  # Sets buffer to length of voltages
+        self.ao_task.control(TaskMode.TASK_COMMIT)
 
         new_v = []
-        for volt in voltages_t :
-            new_v.append([float(item) for item in volt])
-
-        self.ao_task.write(new_v, auto_start=False)
+        for (channel_name, channel_id), data in zip(self.ao_names_to_channels.items(), voltages_t) :
+            self.log.debug(f"Writing channel ao{channel_id}-{channel_name} with :\n"
+                           f"{len(data)} samples, "
+                           f"max={max(data)}, min={min(data)}, "
+                           f"element dtype ={type(data[0])}, sequence dtype = {type(data)}")
+            new_v.append([float(item) for item in data])
+        
+        self.ao_task.write(voltages_t, auto_start=False)
 
     def set_pulse_count(self, pulse_count: int = None):
         """Set the number of pulses to generate or None if pulsing continuously.

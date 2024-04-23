@@ -8,7 +8,7 @@ import tifffile
 from tqdm import tqdm
 from pathlib import Path
 from psutil import virtual_memory, Process
-from os import getpid
+from os import getpid, environ
 from time import perf_counter, sleep, time
 from mock import NonCallableMock as Mock
 from datetime import datetime
@@ -32,6 +32,8 @@ from tigerasi.device_codes import JoystickInput
 from egrabber import query
 from egrabber.generated.errors import TimeoutException
 import sys
+
+
 
 # Constants
 IMARIS_TIMEOUT_S = 0.1
