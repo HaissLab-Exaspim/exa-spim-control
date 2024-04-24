@@ -696,6 +696,8 @@ class Exaspim(Spim):
             len(channels) * frame_count, live=False
         )  # TODO: rewrite to block until ready.
 
+        self.log.info(f"About to capute {frame_count} total frames")
+
         try:
             # Images arrive serialized in repeating channel order.
             for stack_index in tqdm(range(frame_count), desc="ZStack progress"):
@@ -801,8 +803,8 @@ class Exaspim(Spim):
             # was successful.
             timeout = None if capture_successful else IMARIS_TIMEOUT_S
             for ch_name, worker in self.stack_writer_workers.items():
-                force_c = "Force C" if not capture_successful else "C"
-                msg = f"{force_c}losing {ch_name}[nm] channel StackWriter."
+                force_c = "Force " if not capture_successful else ""
+                msg = f"{force_c}Closing {ch_name}[nm] channel StackWriter."
                 level = logging.DEBUG if capture_successful else logging.WARNING
                 self.log.log(level, msg)
                 worker.join(timeout=timeout)
