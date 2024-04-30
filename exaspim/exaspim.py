@@ -412,7 +412,7 @@ class Exaspim(Spim):
         # Move sample to preset starting position if specified.
         # TODO: pass this in as a parameter.
         if self.start_pos is not None:
-            self.sample_pose.move_absolute(self.start_pos)
+            self.sample_pose.move_absolute(**self.start_pos, wait=True)
             self.start_pos = None
         # Reset the starting location.
         self.sample_pose.zero_in_place() # zero in place all machine axes of sample pose, if called without arguments
@@ -910,7 +910,7 @@ class Exaspim(Spim):
         at begining of scan"""
         # FIXME: we should pass a starting position into collect_volumetric_image.
         self.start_pos = coords
-        self.log(f"Set new start positions to {self.start_pos}")
+        self.log.info(f"Set new start positions to {self.start_pos}")
 
     def get_latest_image(self, channel: int = None):
         """Return the most recent acquisition image for display elsewhere.
