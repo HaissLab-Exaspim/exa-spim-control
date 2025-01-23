@@ -137,17 +137,17 @@ def generate_waveforms(cfg : "ExaspimConfig",
         ] = 5.0
 
         # Generate laser TTL signal
-        # voltages_t[ch][
-        #     n2c_index[str(ch)],  # FIXME: remove n2c or move it into the config.
-        #     int(etl_buffer_samples / 2.0)
-        #     + camera_delay_samples : int(etl_buffer_samples / 2.0)
-        #     + camera_exposure_samples
-        #     + dwell_time_samples
-        #     + camera_delay_samples,
-        # ] = cfg.get_channel_ao_voltage(str(ch))
+        voltages_t[ch][
+            n2c_index[str(ch)],  # FIXME: remove n2c or move it into the config.
+            int(etl_buffer_samples / 2.0)
+            + camera_delay_samples : int(etl_buffer_samples / 2.0)
+            + camera_exposure_samples
+            + dwell_time_samples
+            + camera_delay_samples,
+        ] = cfg.get_channel_ao_voltage(str(ch))
 
-        # WARNING : UNCOMMENT ABOVE AND REMOVE THIS IN REAL OPERATION
-        voltages_t[ch][n2c_index[str(ch)],:] = cfg.get_channel_ao_voltage(str(ch))
+        # WARNING : UNCOMMENT ABOVE AND REMOVE THIS LINE BELOW IN REAL OPERATION
+        # voltages_t[ch][n2c_index[str(ch)],:] = cfg.get_channel_ao_voltage(str(ch))
 
 
         # Generate stage TTL signal

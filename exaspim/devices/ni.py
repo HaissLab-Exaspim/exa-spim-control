@@ -77,7 +77,7 @@ class NI:
                 # TODO :hard coded, need to make this config dependant
                 min_val = -1
                 max_val = 10
-            elif any([laser in channel_name for laser in ["488","561","640", "405"]]): 
+            elif any([laser in channel_name for laser in ["488","561","638","405"]]): 
                 min_val = 0
                 max_val = 10
             elif "etl" in channel_name.lower(): 
